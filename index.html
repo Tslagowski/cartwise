@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Cartwise</title>
+  <meta name="theme-color" content="#0f6e56">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="Cartwise">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <link rel="stylesheet" href="styles.css">
+  <script>window.CARTWISE_VERSION = '0.1.0';</script>
+</head>
+<body>
+  <header class="app-head">
+    <h1>Cartwise</h1>
+    <button id="settings-btn" class="icon-btn" aria-label="Settings">⚙︎</button>
+  </header>
+  <button id="backup-banner" class="banner" hidden>It’s been a while since your last backup. Tap to export.</button>
+  <main id="main"></main>
+  <nav id="tabs" class="tabs">
+    <button data-tab="want"><span class="ti">★</span>Want</button>
+    <button data-tab="groceries"><span class="ti">✓</span>Groceries</button>
+    <button data-tab="prices"><span class="ti">$</span>Prices</button>
+    <button data-tab="history"><span class="ti">≡</span>History</button>
+  </nav>
+  <dialog id="sheet" class="sheet"></dialog>
+  <div id="toast" class="toast" role="status"></div>
+  <datalist id="dl-products"></datalist>
+  <datalist id="dl-brands"></datalist>
+  <datalist id="dl-stores"></datalist>
+  <datalist id="dl-categories"></datalist>
+  <datalist id="dl-want-groups"></datalist>
+  <datalist id="dl-gcats"></datalist>
+  <script type="module" src="src/app.js"></script>
+</body>
+</html>
