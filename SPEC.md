@@ -3,7 +3,7 @@
 > Written to be handed straight to a coding agent (Claude Code, Codex, etc.).
 > Draft from the first chat (2026-11-12), updated after seeing my real Notes lists.
 > Not grilled yet: items marked "agent decides" have a default and can change after a grill session.
-> v0.1.0 (M1–M3) is built.
+> v0.1.0 (M1–M3) is built. v0.2.0 adds the mobile UX pass (M5) and pulls barcode scanning forward.
 
 ## 1. Summary
 Cartwise is a phone-first PWA that replaces tracking shopping in the iPhone Notes app. It keeps a **wishlist** of things I want, a **grocery list**, and a **purchase history** (store, product, brand, size, price, date) in one on-device database. The most important outcome: every purchase I record builds a price history I can check later ("is this a good price?").
@@ -19,7 +19,6 @@ Cartwise is a phone-first PWA that replaces tracking shopping in the iPhone Note
 - Works offline after the first load; installable to the home screen
 
 **Later**
-- Barcode scanning to look up a product's price history
 - Receipt capture with on-device text recognition
 - "You usually buy X every N days" suggestions on the grocery list
 - Spend trends by store, category and month
@@ -63,12 +62,13 @@ Just me, on an iPhone 14 Pro Max, in Safari or from the home screen.
 - **Stack:** HTML + CSS + vanilla JS (ES modules), no framework, no build step. Hosted on GitHub Pages via a GitHub Actions deploy.
 - **Storage:** IndexedDB through a small wrapper. Stores:
   - `stores` {id, name}
-  - `products` {id, name, brand, category, defaultSize, defaultUnit}
-  - `trips` {id, storeId, date, note}
+  - `products` {id, name, brand, category, defaultSize, defaultUnit, barcode}
+  - `trips` {id, storeId, date, note, createdAt}
   - `lines` {id, tripId, productId, price, qty, size, unit, onSale}
-  - `wants` {id, name, group, details, priority, targetPrice?, url?, notes, status: open|bought, createdAt, boughtAt?}
-  - `groceries` {id, name, category, store, checked, logged, createdAt}
-- **External services:** none.
+  - `wants` {id, name, group, details, priority, targetPrice?, url?, notes, image (data URL or https URL), status: open|bought, createdAt, boughtAt?}
+  - `groceries` {id, name, category, store, checked, logged, checkedAt, createdAt}
+- **External services:** Microlink (`api.microlink.io`, free tier, no key, ~50 requests/day) only when "From link" is tapped on a wishlist item. Nothing else leaves the phone.
+- **Vendored libraries:** `vendor/zxing.min.js` (@zxing/library 0.21.3, lazy-loaded for barcode scanning on iPhone, where Safari has no BarcodeDetector).
 - **Tests:** pure logic (unit conversion, stats, export/import shape) in `src/lib/`, tested with `node --test`, offline.
 
 ## 6. Milestones
@@ -76,6 +76,15 @@ Just me, on an iPhone 14 Pro Max, in Safari or from the home screen.
 2. **M2 — Core flow:** purchases, products, price history and stats, export/import
 3. **M3 — Want + Groceries:** wishlist and grocery staples with their "bought" flows, plus Notes import
 4. **M4 — Polish:** search, edit/delete everywhere, empty states, persistent-storage prompt
+5. **M5 — Mobile UX (v0.2.0):**
+   - Compact purchase rows (name + price; brand/qty/size/sale/barcode behind "⋯"); empty price falls back to the last price shown as the placeholder
+   - Swipe right = check off / mark bought, swipe left = delete (with Undo) on groceries, wants and purchases
+   - Floating + button for the current tab
+   - Grocery shopping mode: only what's needed plus what's in the cart, bigger rows, screen kept awake, sticky "Log N as purchase"; staples remember the store they were bought at
+   - Wishlist images (photo from the phone, or "From link" via the free Microlink preview API), list or 2-column grid
+   - Price sparklines and good/typical/high dots in Prices and the product sheet
+   - iOS-style grouped lists, SF-style tab icons, haptic tap on check-off/swipe, dark mode tuned
+   - Barcode scan: add an item in the purchase form, price-check from Prices, store a product's barcode
 
 ## 7. Acceptance criteria
 - Given a purchase of "Greek yogurt, 32 oz, $5.99" when I view the product then unit price shows $0.19/oz
@@ -90,7 +99,7 @@ Just me, on an iPhone 14 Pro Max, in Safari or from the home screen.
 - Stores: agent decides — free-form with autocomplete
 
 ## 9. Agent instructions
-- Keep it dependency-free; ask before adding any library
+- Keep it dependency-free beyond what's in `vendor/`; ask before adding any library
 - Pure logic goes in `src/lib/` with tests; UI code may stay untested
 - Never add a backend or paid service
 - Bump the service worker cache version on every deploy

@@ -13,22 +13,24 @@
   <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
   <link rel="stylesheet" href="styles.css">
-  <script>window.CARTWISE_VERSION = '0.1.0';</script>
+  <script>window.CARTWISE_VERSION = '0.2.0';</script>
 </head>
 <body>
   <header class="app-head">
     <h1>Cartwise</h1>
-    <button id="settings-btn" class="icon-btn" aria-label="Settings">⚙︎</button>
+    <button id="settings-btn" class="icon-btn" aria-label="Settings"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33h0a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51h0a1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82v0a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></button>
   </header>
   <button id="backup-banner" class="banner" hidden>It’s been a while since your last backup. Tap to export.</button>
   <main id="main"></main>
   <nav id="tabs" class="tabs">
-    <button data-tab="want"><span class="ti">★</span>Want</button>
-    <button data-tab="groceries"><span class="ti">✓</span>Groceries</button>
-    <button data-tab="prices"><span class="ti">$</span>Prices</button>
-    <button data-tab="history"><span class="ti">≡</span>History</button>
+    <button data-tab="want"><span class="ti"><svg viewBox="0 0 24 24"><path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.3-4.1 5.9-.9z"/></svg></span>Want</button>
+    <button data-tab="groceries"><span class="ti"><svg viewBox="0 0 24 24"><path d="M3 4h2l2.4 11h11l2-8H6.2"/><circle cx="9" cy="19.5" r="1.3"/><circle cx="17" cy="19.5" r="1.3"/></svg></span>Groceries</button>
+    <button data-tab="prices"><span class="ti"><svg viewBox="0 0 24 24"><path d="M3 17l5-5 4 4 8-8"/><path d="M15 8h5v5"/></svg></span>Prices</button>
+    <button data-tab="history"><span class="ti"><svg viewBox="0 0 24 24"><path d="M4 12a8 8 0 1 0 2.4-5.7L4 8.5"/><path d="M4 4v4.5h4.5"/><path d="M12 8v4.5l3 2"/></svg></span>History</button>
   </nav>
+  <button id="fab" class="fab" aria-label="Add">+</button>
   <dialog id="sheet" class="sheet"></dialog>
+  <dialog id="scanner" class="scanner"></dialog>
   <div id="toast" class="toast" role="status"></div>
   <datalist id="dl-products"></datalist>
   <datalist id="dl-brands"></datalist>

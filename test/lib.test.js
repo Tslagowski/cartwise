@@ -112,3 +112,12 @@ test('Notes checklist: unicode checkboxes', () => {
   const rows = parseChecklist('☐ Rice cooker\n☑ Blender');
   assert.deepEqual(rows.map((r) => r.checked), [false, true]);
 });
+
+test('same-day purchases: the one logged later counts as last', () => {
+  const trips = { a: { date: '2026-03-01', createdAt: 1 }, b: { date: '2026-03-01', createdAt: 2 } };
+  const lines = [
+    { tripId: 'b', price: 5.49, size: 32, unit: 'oz' },
+    { tripId: 'a', price: 5.99, size: 32, unit: 'oz' },
+  ];
+  assert.equal(priceHistory(lines, trips, {})[0].price, 5.49);
+});

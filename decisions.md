@@ -12,6 +12,9 @@ Running log from grill sessions. One row per question answered. Big or hard-to-r
 | 6 | 2026-11-12 | How is the wishlist organized? | Grouped by brand or category, with size/fit/color details per item | Matches how I already keep it in Notes (Barbour, Vuori, TVs…) | |
 | 7 | 2026-11-12 | Is the grocery list cleared after each trip? | No. It's a staples list: unchecked = need, checked = got; "Uncheck all" starts a new list | My Notes grocery list is a reusable staples list grouped by category and store | |
 | 8 | 2026-11-12 | How do I get my existing lists in? | Paste from Notes (checklist text parser) | Avoids retyping ~120 items | |
+| 9 | 2026-11-12 | Barcode scanning on iPhone? | Vendor @zxing/library (lazy-loaded); use BarcodeDetector where it exists | Safari has no BarcodeDetector; ZXing is free and runs fully on the phone | |
+| 10 | 2026-11-12 | Wishlist images? | Photo from the phone (downscaled, stored on device) or "From link" via Microlink's free API | No backend allowed, so pages can't be scraped directly; Microlink is free with no setup and only runs when tapped | |
+| 11 | 2026-11-12 | Read prices from store links? | Not in v0.2 | Needs a server to fetch and parse store pages; conflicts with $0 / no backend | |
 
 ## Superseded
 Decisions that were later changed. Keep them, so agents don't re-propose them.

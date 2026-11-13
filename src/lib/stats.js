@@ -19,6 +19,7 @@ export function priceHistory(lines, tripsById, storesById) {
       const trip = tripsById[l.tripId] || {};
       return {
         date: trip.date || '',
+        order: trip.createdAt || 0,
         store: storesById[trip.storeId]?.name || '',
         price: Number(l.price),
         size: l.size,
@@ -28,7 +29,7 @@ export function priceHistory(lines, tripsById, storesById) {
       };
     })
     .filter((e) => e.unit)
-    .sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0));
+    .sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : b.order - a.order));
 }
 
 /**
@@ -56,4 +57,24 @@ export function rate(value, stats) {
   if (value <= stats.lowest.unit.value * 1.02) return 'good';
   if (value > stats.median.value * 1.1) return 'high';
   return 'ok';
+}
+
+/** Rating of the most recent purchase against the ones before it (same unit family). */
+export function lastRating(history) {
+  if (history.length < 2) return null;
+  const [last, ...rest] = history;
+  const prev = rest.filter((e) => e.unit.family === last.unit.family);
+  if (!prev.length) return null;
+  return rate(last.unit.value, productStats(prev));
+}
+
+/** Unit-price values oldest → newest for a sparkline (same family as the latest, at most `max`). */
+export function trendValues(history, max = 12) {
+  if (!history.length) return [];
+  const fam = history[0].unit.family;
+  return history
+    .filter((e) => e.unit.family === fam)
+    .slice(0, max)
+    .map((e) => e.unit.value)
+    .reverse();
 }
