@@ -1037,6 +1037,11 @@ async function openSettings() {
     </div>
     <h3>Bring in a list</h3>
     <div class="group-box form"><button type="button" class="btn" data-notes>Paste from Notes</button></div>
+    <h3>Text size</h3>
+    <div class="group-box form">
+      <div class="seg-toggle full" role="radiogroup" aria-label="Text size">${[['small', 'Smaller'], ['default', 'Default'], ['large', 'Larger']]
+        .map(([v, l]) => `<label><input type="radio" name="textSize" value="${v}" ${(store('textSize') || 'default') === v ? 'checked' : ''}><span>${l}</span></label>`).join('')}</div>
+    </div>
     <h3>Storage</h3>
     <div class="group-box form">
       <p class="sub">${persisted ? 'Persistent storage is on, so Safari won’t clear your data on its own.' : 'Storage isn’t marked persistent yet. Adding Cartwise to your Home Screen helps; exporting regularly keeps you safe either way.'}</p>
@@ -1047,6 +1052,10 @@ async function openSettings() {
     <p class="sub version">Cartwise v${window.CARTWISE_VERSION || ''} · ${S.trips.length} trips · ${S.products.length} items priced</p>`;
   openSheet('Settings', body, (d) => {
     $('[data-export]', d).onclick = exportData;
+    $$('[name=textSize]', d).forEach((r) => r.addEventListener('change', () => {
+      store('textSize', r.value);
+      document.documentElement.dataset.text = r.value;
+    }));
     $('[data-notes]', d).onclick = () => openNotesImport(tab === 'groceries' ? 'groceries' : 'wants');
     $('[data-import]', d).onchange = async (e) => {
       const f = e.target.files[0];

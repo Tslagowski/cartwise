@@ -414,3 +414,24 @@ input, select, textarea { font-size: 16px; min-height: 40px; padding: 8px 11px; 
 .qty-field { width: 76px; flex: none; }
 
 .swipe:not(.reveal) .swipe-actions { visibility: hidden; }
+
+/* ---------- v0.4.1 smaller text + text size setting ----------
+   iOS auto-zoom on focus is blocked by maximum-scale=1 in the viewport tag,
+   so inputs no longer need to be 16px. */
+body { font-size: 15px; }
+.title { font-size: 15px; }
+.sub { font-size: 12px; }
+input, select, textarea { font-size: 15px; min-height: 38px; }
+.app-head h1 { font-size: 26px; }
+.group h3, .sheet h3 { font-size: 11px; }
+.chip { font-size: 13px; min-height: 30px; }
+.btn { font-size: 14px; min-height: 38px; }
+.actions.sticky .btn { font-size: 15px; min-height: 44px; }
+.list > li:not(.swipe), .list .cell { min-height: 42px; }
+.seg-toggle > button, .seg-toggle > label { font-size: 13px; }
+.sheet-head h2 { font-size: 16px; }
+.qty { font-size: 12px; }
+/* Text size setting scales the whole UI (Safari supports CSS zoom). */
+html[data-text="small"] body { zoom: 0.9; }
+html[data-text="large"] body { zoom: 1.12; }
+.icon-btn:focus:not(:focus-visible), .sheet :focus:not(:focus-visible) { outline: none; }
