@@ -362,3 +362,55 @@ body.has-sticky .toast { bottom: calc(var(--tabbar) + 90px + env(safe-area-inset
 .grabber { touch-action: none; box-sizing: content-box; padding: 10px 40px 4px; background-clip: content-box; }
 .add-chip { background: transparent !important; color: var(--accent) !important; border: 1.5px dashed color-mix(in srgb, var(--accent) 55%, transparent); }
 .chip-input { flex: none; width: 150px; min-height: 36px; padding: 0 14px; border-radius: 99px; font-size: 15px; background: var(--card) !important; box-shadow: 0 0 0 2px var(--accent); }
+
+/* ---------- v0.4 compact pass ---------- */
+:root { --tabbar: 50px; --radius: 12px; }
+body { font-size: 16px; }
+.app-head { padding: calc(4px + env(safe-area-inset-top)) 12px 4px 16px; }
+.app-head h1 { font-size: 28px; }
+.icon-btn.round { width: 34px; height: 34px; min-width: 34px; min-height: 34px; }
+.icon-btn.round svg { width: 18px; height: 18px; }
+main { padding: 0 12px 20px; }
+.tabs button { font-size: 10px; gap: 2px; }
+.tabs .ti svg { width: 23px; height: 23px; }
+
+.group h3, .sheet h3 { font-size: 12px; margin: 14px 12px 5px; }
+.list > li:not(.swipe), .list .cell { padding: 7px 12px; min-height: 44px; gap: 10px; }
+.list > li + li::before { left: 12px; }
+.title { font-size: 16px; }
+.sub { font-size: 13px; }
+.checkbox { width: 24px; height: 24px; }
+.checkbox.on::after, .cell.done .checkbox::after { left: 7px; top: 3px; width: 6px; height: 11px; }
+.cell.done .checkbox::after { content: ""; position: absolute; border: solid var(--on-accent); border-width: 0 2.5px 2.5px 0; transform: rotate(45deg); }
+.qty { display: inline-block; min-width: 20px; margin-right: 6px; padding: 0 6px; border-radius: 6px; background: var(--accent-soft); color: var(--accent); font-size: 13px; font-weight: 700; text-align: center; vertical-align: 1px; }
+.thumb { width: 40px; height: 40px; border-radius: 8px; }
+.swipe-actions .sa { min-width: 70px; font-size: 14px; }
+
+.chip { min-height: 32px; padding: 0 12px; font-size: 14px; }
+.chips { gap: 6px; }
+.chips.scroll { margin: 2px -12px 0; padding: 4px 12px; }
+.quick-add { margin: 4px 0 0; }
+.quick-add input { min-height: 42px; }
+input, select, textarea { font-size: 16px; min-height: 40px; padding: 8px 11px; }
+#want-search, #price-search { min-height: 36px; }
+.tab-head { gap: 8px; margin: 2px 0 4px; }
+.seg-toggle.top { margin: 2px 0 6px; }
+.seg-toggle > button, .seg-toggle > label { min-height: 30px; font-size: 13px; }
+.summary-card { padding: 10px 14px; }
+.summary-card b { font-size: 22px; }
+.usuals { margin-top: 18px; }
+.usual-group { margin-top: 8px; }
+.empty { padding: 28px 12px; }
+.btn { min-height: 40px; font-size: 15px; padding: 0 14px; }
+.actions.sticky .btn { min-height: 46px; font-size: 16px; }
+.actions.sticky { padding: 8px 12px; }
+
+.sheet-body { gap: 10px; padding: 4px 12px calc(16px + env(safe-area-inset-bottom)); }
+.sheet-head h2 { font-size: 17px; }
+.group-box.form { padding: 10px 12px; gap: 8px; }
+.stats b { font-size: 15px; }
+.img-box { width: 60px; height: 60px; }
+.name-qty { display: flex; gap: 8px; align-items: flex-end; }
+.qty-field { width: 76px; flex: none; }
+
+.swipe:not(.reveal) .swipe-actions { visibility: hidden; }

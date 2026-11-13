@@ -66,7 +66,7 @@ Just me, on an iPhone 14 Pro Max, in Safari or from the home screen.
   - `trips` {id, storeId, date, note, createdAt}
   - `lines` {id, tripId, productId, price, qty, size, unit, onSale}
   - `wants` {id, name, brand, category, details, priority: Low|Medium|High, targetPrice?, url?, notes, image (data URL or https URL), status: open|bought, createdAt, boughtAt?, v}
-  - `groceries` {id, name, aisle, store, status: need|cart|stocked, lastBought?, createdAt, v}
+  - `groceries` {id, name, qty, details, aisle, store, status: need|cart|stocked, lastBought?, createdAt, v}
 - **External services:** Microlink (`api.microlink.io`, free tier, no key, ~50 requests/day) only when "From link" is tapped on a wishlist item. Nothing else leaves the phone.
 - **Vendored libraries:** `vendor/zxing.min.js` (@zxing/library 0.21.3, lazy-loaded for barcode scanning on iPhone, where Safari has no BarcodeDetector).
 - **Tests:** pure logic (unit conversion, stats, export/import shape) in `src/lib/`, tested with `node --test`, offline.
@@ -92,6 +92,7 @@ Organized like dedicated list apps (AnyList, Reminders, Bring!), not like the No
 - **Groceries:** one list sorted by store aisle (Produce, Meat & Seafood, Dairy & Eggs, Bakery, Pantry, Frozen, Snacks, Drinks, Spices & Sauces, Health, Household, Pet, Other), auto-assigned from the item name and editable. Quick-add box with suggestions from your usuals. Tap a row to put it in the cart; "In cart" sits at the bottom. "Finish shopping" → Log prices or Clear cart. Items you're not buying now live in **Your usuals** (tap a chip to add back). Store chips filter the list when items have more than one usual store.
 - **Wishlist:** category chips (All, Clothing, Kitchen, Home, Tech, Other, Bought) with counts and search. All = sections by category with brand on each row; one category = sections by brand. Brand, size/fit and notes are fields. Must-have items get a star; target price shows as a pill; photos only when added.
 - **Swipe to reveal:** swiping left only reveals buttons (Edit/Remove, Bought/Delete, Delete). Nothing happens until a button is tapped; tapping elsewhere closes the row. Deletes offer Undo.
+- **v0.4.0:** grocery items get **Qty** (free text, e.g. "2 bags") and **Details** (type, brand, size, flavor). Names typed or imported as "Potatoes (gold/russet/sweet)" split into name + details; existing items are upgraded once (schema v3) and matching products are renamed so price history stays linked. Compact layout pass (smaller header, rows, chips; inputs stay at 16px so iOS doesn't zoom).
 - **Migration:** on load, old records are upgraded (`groceries.status` need|cart|stocked + `aisle`; `wants.brand` + `category` from the old heading, with heading notes like "(wait for $40 deals)" moved into notes).
 
 ## 7. Acceptance criteria

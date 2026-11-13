@@ -20,6 +20,7 @@ Running log from grill sessions. One row per question answered. Big or hard-to-r
 | 11 | 2026-11-12 | Read prices from store links? | Not in v0.2 | Needs a server to fetch and parse store pages; conflicts with $0 / no backend | |
 | 12 | 2026-11-12 | Should swipes act immediately? | No. Swipe left only reveals action buttons; tap to confirm; deletes have Undo | Full-swipe delete/bought was too easy to trigger by accident | |
 | 13 | 2026-11-12 | How should the app be organized? | Reinvented around list-app patterns: 3 tabs; groceries by store aisle with usuals + cart; wishlist by category chips with brand as a field | v0.2 copied the Notes structure and felt cluttered; Notes layout is not a requirement | |
+| 14 | 2026-11-13 | Where do grocery specifics go (e.g. which potatoes)? | Per-item Qty and Details fields; "Name (details)" auto-splits | Keeps names short and lists scannable | |
 
 ## Superseded
 Decisions that were later changed. Keep them, so agents don't re-propose them.

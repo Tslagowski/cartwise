@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { aisleFor, classifyWant, splitHeading } from '../src/lib/categorize.js';
-import { migrateGrocery, migrateWant, migrateAll } from '../src/lib/migrate.js';
+import { migrateGrocery, migrateWant, migrateAll, splitItemName } from '../src/lib/migrate.js';
 
 test('aisles from real grocery names', () => {
   const cases = {
@@ -50,6 +50,7 @@ test('old grocery records upgrade', () => {
   assert.equal(migrateGrocery({ id: '1', name: 'Eggs', checked: false }).status, 'need');
   assert.equal(migrateGrocery({ id: '1', name: 'Eggs', checked: true, logged: false }).status, 'cart');
   const m = migrateGrocery({ id: '1', name: 'Eggs', checked: true, logged: true, category: 'Protein' });
+  assert.equal(m.v, 3);
   assert.equal(m.status, 'stocked');
   assert.equal(m.aisle, 'Dairy & Eggs');
   assert.equal('category' in m, false);
@@ -65,7 +66,7 @@ test('old want records upgrade and keep notes', () => {
 });
 
 test('migrateAll only touches old records', () => {
-  const ops = migrateAll({ groceries: [{ id: 'a', name: 'Eggs', v: 2, status: 'need' }, { id: 'b', name: 'Milk' }], wants: [] });
+  const ops = migrateAll({ groceries: [{ id: 'a', name: 'Eggs', v: 3, status: 'need' }, { id: 'b', name: 'Milk' }], wants: [] });
   assert.equal(ops.length, 1);
   assert.equal(ops[0].put.id, 'b');
 });
@@ -74,4 +75,23 @@ test('sugar-free drinks stay drinks, pants stay clothing', () => {
   assert.equal(aisleFor('Juice - zero sugar'), 'Drinks');
   assert.equal(classifyWant('', 'Meta pant athletic slim fit').category, 'Clothing');
   assert.equal(classifyWant('', 'Cast iron pan').category, 'Kitchen');
+});
+
+test('v3 splits "(details)" out of grocery names and keeps price history linked', () => {
+  const ops = migrateAll({
+    groceries: [{ id: 'a', name: 'Potatoes (gold/russet/sweet)', v: 2, status: 'need', aisle: 'Produce' }],
+    products: [{ id: 'p', name: 'Potatoes (gold/russet/sweet)', brand: '' }, { id: 'q', name: 'Eggs' }],
+  });
+  const g = ops.find((o) => o.store === 'groceries').put;
+  assert.equal(g.name, 'Potatoes');
+  assert.equal(g.details, 'gold/russet/sweet');
+  assert.equal(g.aisle, 'Produce');
+  const prods = ops.filter((o) => o.store === 'products');
+  assert.equal(prods.length, 1);
+  assert.equal(prods[0].put.name, 'Potatoes');
+});
+
+test('names without parentheses are left alone', () => {
+  assert.deepEqual(splitItemName('Eggs'), { name: 'Eggs', details: '' });
+  assert.equal(migrateGrocery({ id: 'x', name: 'Eggs', v: 2, status: 'need' }).name, 'Eggs');
 });

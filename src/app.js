@@ -5,7 +5,7 @@ import { makeExport, parseImport } from './lib/backup.js';
 import { parseChecklist } from './lib/notes.js';
 import { sparkPath, sparkEnd } from './lib/spark.js';
 import { AISLES, WANT_CATEGORIES, aisleFor, classifyWant } from './lib/categorize.js';
-import { migrateAll, SCHEMA } from './lib/migrate.js';
+import { migrateAll, SCHEMA, splitItemName } from './lib/migrate.js';
 import { scanBarcode } from './scanner.js';
 
 // ---------- state ----------
@@ -143,7 +143,9 @@ function closeOpenRow() {
   const c = openRow.querySelector('.swipe-content');
   c.style.transition = 'transform .22s ease';
   c.style.transform = '';
-  openRow.classList.remove('open');
+  const r = openRow;
+  r.classList.remove('open');
+  setTimeout(() => { if (!r.classList.contains('open')) r.classList.remove('reveal'); }, 240);
   openRow = null;
   return true;
 }
@@ -168,6 +170,7 @@ function enableSwipe(root) {
     if (locked === null && (Math.abs(x) > 10 || Math.abs(y) > 10)) locked = Math.abs(x) > Math.abs(y) * 1.2 ? 'x' : 'y';
     if (locked !== 'x') return;
     e.preventDefault();
+    row.classList.add('reveal');
     dx = x;
     let pos = base + dx;
     if (pos > 0) pos = 0;
@@ -191,6 +194,7 @@ function enableSwipe(root) {
     } else {
       c.style.transform = '';
       r.classList.remove('open');
+      setTimeout(() => { if (!r.classList.contains('open')) r.classList.remove('reveal'); }, 240);
       if (openRow === r) openRow = null;
     }
     r.dataset.justSwiped = '1';
@@ -287,7 +291,7 @@ function renderGroceries() {
     return swipeRow(
       `<div class="cell tap ${g.status === 'cart' ? 'done' : ''}" data-gtoggle="${g.id}">
         <span class="checkbox ${g.status === 'cart' ? 'on' : ''}" aria-hidden="true"></span>
-        <div class="grow"><div class="title">${esc(g.name)}</div></div>
+        <div class="grow"><div class="title">${g.qty ? `<span class="qty">${esc(g.qty)}</span>` : ''}${esc(g.name)}</div>${g.details ? `<div class="sub">${esc(g.details)}</div>` : ''}</div>
         ${st ? `<span class="sub price">${formatMoney(st.last.price)}</span>` : ''}
       </div>`,
       [{ act: 'gedit', label: 'Edit', cls: 'gray' }, { act: 'gremove', label: 'Remove', cls: 'red' }],
@@ -329,18 +333,18 @@ function wireQuickAdd() {
   input.addEventListener('input', () => {
     const m = matches();
     box.hidden = !m.length;
-    box.innerHTML = m.map((g) => `<button type="button" data-usual="${g.id}">${esc(g.name)}<span class="sub">${esc(g.aisle)}</span></button>`).join('');
+    box.innerHTML = m.map((g) => `<button type="button" data-usual="${g.id}"><span>${esc(g.name)}${g.details ? ` <span class="sub">${esc(g.details)}</span>` : ''}</span><span class="sub">${esc(g.aisle)}</span></button>`).join('');
   });
   form.onsubmit = async (e) => {
     e.preventDefault();
-    const name = input.value.trim();
+    const { name, details } = splitItemName(input.value.trim());
     if (!name) return;
     const existing = S.groceries.find((g) => lc(g.name) === lc(name));
     if (existing) {
       if (existing.status === 'need') { toast('Already on your list'); input.value = ''; return; }
-      await write([{ store: 'groceries', put: { ...existing, status: 'need' } }]);
+      await write([{ store: 'groceries', put: { ...existing, status: 'need', details: details || existing.details || '' } }]);
     } else {
-      await write([{ store: 'groceries', put: { id: newId(), name, aisle: aisleFor(name), store: ui.storeFilter, status: 'need', createdAt: new Date().toISOString(), v: SCHEMA } }]);
+      await write([{ store: 'groceries', put: { id: newId(), name, details, qty: '', aisle: aisleFor(name), store: ui.storeFilter, status: 'need', createdAt: new Date().toISOString(), v: SCHEMA } }]);
     }
     haptic();
     await reload();
@@ -356,10 +360,14 @@ async function setGrocery(g, patch, undoMsg) {
 
 function openGrocery(g) {
   const isNew = !g;
-  g = g || { id: newId(), name: '', aisle: 'Other', store: ui.storeFilter, status: 'need', createdAt: new Date().toISOString(), v: SCHEMA };
+  g = g || { id: newId(), name: '', details: '', qty: '', aisle: 'Other', store: ui.storeFilter, status: 'need', createdAt: new Date().toISOString(), v: SCHEMA };
   const body = `
     <div class="group-box form">
-      <label>Item<input name="name" value="${esc(g.name)}" placeholder="e.g. Greek yogurt"></label>
+      <div class="name-qty">
+        <label class="grow">Item<input name="name" value="${esc(g.name)}" placeholder="e.g. Potatoes"></label>
+        <label class="qty-field">Qty<input name="qty" value="${esc(g.qty)}" placeholder="1" autocomplete="off"></label>
+      </div>
+      <label>Details<textarea name="details" rows="2" placeholder="Type, brand, size, flavor… e.g. gold or russet, 5 lb bag">${esc(g.details)}</textarea></label>
     </div>
     <h3>Usual store</h3>
     <div class="chips wrap" role="radiogroup">${['', ...storeNames()].map((s) => `<label class="chip"><input type="radio" name="store" value="${esc(s)}" ${s === (g.store || '') ? 'checked' : ''}>${esc(s || 'Any store')}</label>`).join('')}${newChip('New store', 'store')}</div>
@@ -384,7 +392,7 @@ function openGrocery(g) {
     $('[data-save]', d).onclick = async () => {
       const name = nameEl.value.trim();
       if (!name) return toast('Name is required');
-      await write([{ store: 'groceries', put: { ...g, name, store: $('[name=store]:checked', d)?.value || '', aisle: $('[name=aisle]:checked', d)?.value || 'Other' } }]);
+      await write([{ store: 'groceries', put: { ...g, name, qty: $('[name=qty]', d).value.trim(), details: $('[name=details]', d).value.trim(), store: $('[name=store]:checked', d)?.value || '', aisle: $('[name=aisle]:checked', d)?.value || 'Other' } }]);
       d.close();
       await reload();
     };
@@ -974,14 +982,15 @@ function openNotesImport(kind = 'wants') {
       if (!rows.length) return toast('No checklist items found');
       const now = new Date().toISOString();
       const existing = new Set(S.groceries.map((g) => lc(g.name)));
+      rows.forEach((r) => (r.key = lc(splitItemName(r.name).name)));
       const ops = k() === 'wants'
         ? rows.map((r) => {
             const c = classifyWant(r.group, r.name);
             return { store: 'wants', put: { id: newId(), name: r.name, brand: c.brand, category: c.category, details: '', priority: 'Medium', notes: c.note, url: '', targetPrice: null, image: '', status: r.checked ? 'bought' : 'open', createdAt: now, v: SCHEMA } };
           })
-        : rows.filter((r) => !existing.has(lc(r.name))).map((r) => ({
+        : rows.filter((r) => !existing.has(r.key)).map((r) => ({
             store: 'groceries',
-            put: { id: newId(), name: r.name, aisle: aisleFor(r.name), store: r.outer || '', status: r.checked ? 'stocked' : 'need', createdAt: now, v: SCHEMA },
+            put: { id: newId(), ...splitItemName(r.name), qty: '', aisle: aisleFor(r.name), store: r.outer || '', status: r.checked ? 'stocked' : 'need', createdAt: now, v: SCHEMA },
           }));
       await write(ops);
       d.close();
