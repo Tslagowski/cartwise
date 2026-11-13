@@ -94,6 +94,7 @@ Organized like dedicated list apps (AnyList, Reminders, Bring!), not like the No
 - **Swipe to reveal:** swiping left only reveals buttons (Edit/Remove, Bought/Delete, Delete). Nothing happens until a button is tapped; tapping elsewhere closes the row. Deletes offer Undo.
 - **v0.4.0:** grocery items get **Qty** (free text, e.g. "2 bags") and **Details** (type, brand, size, flavor). Names typed or imported as "Potatoes (gold/russet/sweet)" split into name + details; existing items are upgraded once (schema v3) and matching products are renamed so price history stays linked. Compact layout pass (smaller header, rows, chips; inputs stay at 16px so iOS doesn't zoom).
 - **v0.4.1:** smaller default text (15px body). iOS input auto-zoom is blocked with `maximum-scale=1` in the viewport (pinch-zoom still works in Safari), so inputs no longer need 16px. Settings → Text size (Smaller / Default / Larger) scales the whole UI with CSS zoom, saved per device.
+- **v0.4.2:** updates reliably on the Home Screen app: the service worker fetches with `cache: 'no-cache'` (GitHub Pages sends max-age=600), installs with `cache: 'reload'`, registers with `updateViaCache: 'none'`, checks for updates on launch, on returning to the foreground and every 30 minutes, and reloads once a new version takes over ("Updated to vX" toast).
 - **Migration:** on load, old records are upgraded (`groceries.status` need|cart|stocked + `aisle`; `wants.brand` + `category` from the old heading, with heading notes like "(wait for $40 deals)" moved into notes).
 
 ## 7. Acceptance criteria

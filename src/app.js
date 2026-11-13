@@ -1259,13 +1259,37 @@ async function runMigrations() {
   if (ops.length) await write(ops);
 }
 
+// Keep the Home Screen app current: check for a new version on launch and every time
+// it comes back to the foreground, and reload once the new version takes over.
+function setupUpdates() {
+  if (!('serviceWorker' in navigator)) return;
+  const hadController = !!navigator.serviceWorker.controller;
+  let reloading = false;
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (!hadController || reloading) return;
+    reloading = true;
+    store('justUpdated', '1');
+    location.reload();
+  });
+  navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' }).then((reg) => {
+    const check = () => reg.update().catch(() => {});
+    document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') check(); });
+    setInterval(check, 30 * 60 * 1000);
+  }).catch(() => {});
+}
+
 async function start() {
   const saved = store('tab');
   tab = saved === 'want' ? 'wishlist' : saved === 'history' ? 'prices' : TITLES[saved] ? saved : 'groceries';
   wire();
   await runMigrations();
   await reload();
-  if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js').catch(() => {});
+  setupUpdates();
+  const updated = store('justUpdated');
+  if (updated) {
+    store('justUpdated', '');
+    toast(`Updated to v${window.CARTWISE_VERSION}`);
+  }
 }
 
 start();
