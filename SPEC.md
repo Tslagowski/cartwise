@@ -3,7 +3,7 @@
 > Written to be handed straight to a coding agent (Claude Code, Codex, etc.).
 > Draft from the first chat (2026-11-12), updated after seeing my real Notes lists.
 > Not grilled yet: items marked "agent decides" have a default and can change after a grill session.
-> v0.1.0 (M1–M3) is built. v0.2.0 adds the mobile UX pass (M5) and pulls barcode scanning forward.
+> v0.1.0 (M1–M3) is built. v0.2.0 added the mobile UX pass (M5). v0.3.0 reorganizes the app (M6) — where this spec and M6 disagree with older sections, M6 wins.
 
 ## 1. Summary
 Cartwise is a phone-first PWA that replaces tracking shopping in the iPhone Notes app. It keeps a **wishlist** of things I want, a **grocery list**, and a **purchase history** (store, product, brand, size, price, date) in one on-device database. The most important outcome: every purchase I record builds a price history I can check later ("is this a good price?").
@@ -65,8 +65,8 @@ Just me, on an iPhone 14 Pro Max, in Safari or from the home screen.
   - `products` {id, name, brand, category, defaultSize, defaultUnit, barcode}
   - `trips` {id, storeId, date, note, createdAt}
   - `lines` {id, tripId, productId, price, qty, size, unit, onSale}
-  - `wants` {id, name, group, details, priority, targetPrice?, url?, notes, image (data URL or https URL), status: open|bought, createdAt, boughtAt?}
-  - `groceries` {id, name, category, store, checked, logged, checkedAt, createdAt}
+  - `wants` {id, name, brand, category, details, priority: Low|Medium|High, targetPrice?, url?, notes, image (data URL or https URL), status: open|bought, createdAt, boughtAt?, v}
+  - `groceries` {id, name, aisle, store, status: need|cart|stocked, lastBought?, createdAt, v}
 - **External services:** Microlink (`api.microlink.io`, free tier, no key, ~50 requests/day) only when "From link" is tapped on a wishlist item. Nothing else leaves the phone.
 - **Vendored libraries:** `vendor/zxing.min.js` (@zxing/library 0.21.3, lazy-loaded for barcode scanning on iPhone, where Safari has no BarcodeDetector).
 - **Tests:** pure logic (unit conversion, stats, export/import shape) in `src/lib/`, tested with `node --test`, offline.
@@ -85,6 +85,14 @@ Just me, on an iPhone 14 Pro Max, in Safari or from the home screen.
    - Price sparklines and good/typical/high dots in Prices and the product sheet
    - iOS-style grouped lists, SF-style tab icons, haptic tap on check-off/swipe, dark mode tuned
    - Barcode scan: add an item in the purchase form, price-check from Prices, store a product's barcode
+
+### M6 — Reorganize (v0.3.0)
+Organized like dedicated list apps (AnyList, Reminders, Bring!), not like the Notes lists it replaced.
+- **Three tabs:** Groceries, Wishlist, Prices (Items | Trips). Header shows the tab name with a contextual + and Settings.
+- **Groceries:** one list sorted by store aisle (Produce, Meat & Seafood, Dairy & Eggs, Bakery, Pantry, Frozen, Snacks, Drinks, Spices & Sauces, Health, Household, Pet, Other), auto-assigned from the item name and editable. Quick-add box with suggestions from your usuals. Tap a row to put it in the cart; "In cart" sits at the bottom. "Finish shopping" → Log prices or Clear cart. Items you're not buying now live in **Your usuals** (tap a chip to add back). Store chips filter the list when items have more than one usual store.
+- **Wishlist:** category chips (All, Clothing, Kitchen, Home, Tech, Other, Bought) with counts and search. All = sections by category with brand on each row; one category = sections by brand. Brand, size/fit and notes are fields. Must-have items get a star; target price shows as a pill; photos only when added.
+- **Swipe to reveal:** swiping left only reveals buttons (Edit/Remove, Bought/Delete, Delete). Nothing happens until a button is tapped; tapping elsewhere closes the row. Deletes offer Undo.
+- **Migration:** on load, old records are upgraded (`groceries.status` need|cart|stocked + `aisle`; `wants.brand` + `category` from the old heading, with heading notes like "(wait for $40 deals)" moved into notes).
 
 ## 7. Acceptance criteria
 - Given a purchase of "Greek yogurt, 32 oz, $5.99" when I view the product then unit price shows $0.19/oz

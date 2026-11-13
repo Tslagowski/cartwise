@@ -5,13 +5,11 @@ Phone-first shopping + grocery app: a **wishlist** of things I want, a reusable 
 **Live:** https://tslagowski.github.io/cartwise/ — open in Safari → Share → **Add to Home Screen**.
 
 ## What it does
-- **Want:** wishlist grouped by brand or category (Barbour, Vuori, TVs…) as a list or photo grid, with size/fit/color, target price, priority, link, notes and a photo (from your camera roll or pulled from the link).
-- **Groceries:** staples that stay put, grouped by store and category. **Start shopping** shows only what you need, in big rows, and keeps the screen on. "Log N as purchase" turns what's in your cart into a purchase.
-- **Prices:** every product with last / lowest / typical unit price ($/oz, $/lb, $/ct), a trend sparkline, and a green / gray / orange dot for whether the last price was good, typical or high. **Scan** a barcode in the store to check a price.
-- **History:** purchases by month, plus this month's spend.
-- **Fast logging:** each item is one row (name + price; the last price is pre-filled). Details hide behind "⋯". Scan items to add them.
-- **Gestures:** swipe right to check off / mark bought, swipe left to delete (with Undo). The + button adds whatever fits the tab you're on.
-- **Paste from Notes:** paste an Apple Notes checklist; headings become groups/categories, checked items come in as bought/got.
+- **Groceries:** one list sorted by store aisle. Type in the quick-add box (it suggests your usuals), tap an item to put it in the cart, then **Finish shopping** to log prices or just clear the cart. Things you're not buying right now live in **Your usuals**, one tap to add back. Filter by store if you shop at more than one.
+- **Wishlist:** filter by category (Clothing, Kitchen, Home, Tech…) with counts and search. Each wish has a brand, size/fit, target price, priority (★ must-have), link, notes and an optional photo.
+- **Prices:** every item with its last price, unit price, trend line and a green / gray / orange dot (good / typical / high). **Scan** a barcode to check a price in the store. **Trips** shows past shopping trips and this month's spend.
+- **Safe gestures:** swipe left on a row to reveal its buttons (Edit, Remove, Bought, Delete). Nothing happens until you tap one, and deletes can be undone.
+- **Paste from Notes:** paste an Apple Notes checklist; Cartwise sorts groceries into aisles and wishes into categories, using headings as brands.
 - **Backup:** Settings → Export saves a JSON file (put it in iCloud Drive). Import restores it.
 
 ## How data is stored
