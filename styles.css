@@ -354,3 +354,11 @@ body.has-sticky .toast { bottom: calc(var(--tabbar) + 90px + env(safe-area-inset
   .seg-toggle > button[aria-pressed="true"], .seg-toggle > label:has(input:checked) { background: #48484a; }
   .sa.gray { background: #636366; }
 }
+
+/* v0.3.1: bigger drag handle, inline "+ New" chips */
+.grabber { width: 40px; height: 5px; margin: 0 auto; }
+.sheet-inner > .grabber { margin-top: 0; }
+.sheet-head { touch-action: none; padding-top: 8px; }
+.grabber { touch-action: none; box-sizing: content-box; padding: 10px 40px 4px; background-clip: content-box; }
+.add-chip { background: transparent !important; color: var(--accent) !important; border: 1.5px dashed color-mix(in srgb, var(--accent) 55%, transparent); }
+.chip-input { flex: none; width: 150px; min-height: 36px; padding: 0 14px; border-radius: 99px; font-size: 15px; background: var(--card) !important; box-shadow: 0 0 0 2px var(--accent); }

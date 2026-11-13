@@ -202,6 +202,59 @@ const swipeRow = (inner, actions, attrs = '') =>
     .map((a) => `<button type="button" class="sa ${a.cls || ''}" data-act="${a.act}">${esc(a.label)}</button>`)
     .join('')}</div><div class="swipe-content">${inner}</div></li>`;
 
+// ---------- custom categories & stores ----------
+// Wishlist categories = the defaults plus any you've created (kept on the items that use them).
+function wantCategories() {
+  const custom = [...new Set(S.wants.map((w) => w.category).filter((c) => c && !WANT_CATEGORIES.includes(c)))].sort();
+  return [...WANT_CATEGORIES.filter((c) => c !== 'Other'), ...custom, 'Other'];
+}
+// Grocery stores = stores you've added or shopped at, plus any set on items.
+function storeNames() {
+  return [...new Set([...S.stores.map((s) => s.name), ...S.groceries.map((g) => g.store)].filter(Boolean))].sort((a, b) => a.localeCompare(b));
+}
+async function addStore(name) {
+  name = name.trim();
+  if (!name) return null;
+  const existing = S.stores.find((s) => lc(s.name) === lc(name));
+  if (existing) return existing.name;
+  await write([{ store: 'stores', put: { id: newId(), name } }]);
+  S.stores.push({ name });
+  return name;
+}
+// A "+ New" chip that turns into a text box. onAdd(name) runs on Enter.
+const newChip = (label, kind) => `<button type="button" class="chip add-chip" data-newchip="${kind}">+ ${esc(label)}</button>`;
+function openNewChip(btn, placeholder, onAdd) {
+  const input = document.createElement('input');
+  input.className = 'chip-input';
+  input.placeholder = placeholder;
+  input.enterKeyHint = 'done';
+  btn.replaceWith(input);
+  input.focus();
+  let done = false;
+  const finish = async (commit) => {
+    if (done) return;
+    done = true;
+    const v = input.value.trim();
+    if (commit && v) await onAdd(v, input);
+    if (input.isConnected) input.replaceWith(btn);
+  };
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') { e.preventDefault(); finish(true); }
+    if (e.key === 'Escape') finish(false);
+  });
+  input.addEventListener('blur', () => finish(true));
+}
+// Insert a checked radio chip before the "+ New" input inside a chip group.
+function addRadioChip(input, name, value) {
+  const group = input.closest('.chips');
+  const dup = [...group.querySelectorAll(`input[name="${name}"]`)].find((r) => lc(r.value) === lc(value));
+  if (dup) return (dup.checked = true);
+  const label = document.createElement('label');
+  label.className = 'chip';
+  label.innerHTML = `<input type="radio" name="${name}" value="${esc(value)}" checked>${esc(value)}`;
+  input.before(label);
+}
+
 // ---------- datalists ----------
 function renderDatalists() {
   const uniq = (xs) => [...new Set(xs.filter(Boolean))].sort((a, b) => a.localeCompare(b));
@@ -219,7 +272,7 @@ const aisleIndex = (a) => {
   const i = AISLES.indexOf(a);
   return i < 0 ? AISLES.length : i;
 };
-const groceryStores = () => [...new Set(S.groceries.map((g) => g.store).filter(Boolean))].sort();
+const groceryStores = () => storeNames();
 const inStoreFilter = (g) => !ui.storeFilter || !g.store || g.store === ui.storeFilter;
 
 function renderGroceries() {
@@ -245,9 +298,9 @@ function renderGroceries() {
     groupBy([...xs].sort((a, b) => aisleIndex(a.aisle) - aisleIndex(b.aisle) || a.name.localeCompare(b.name)), (g) => g.aisle || 'Other');
 
   return `
-    ${stores.length > 1 ? `<div class="chips scroll" role="tablist">${['', ...stores]
+    ${S.groceries.length ? `<div class="chips scroll" role="tablist">${['', ...stores]
       .map((s) => `<button class="chip ${ui.storeFilter === s ? 'on' : ''}" data-store-filter="${esc(s)}">${esc(s || 'All stores')}</button>`)
-      .join('')}</div>` : ''}
+      .join('')}${newChip('Store', 'store-filter')}</div>` : ''}
     <form class="quick-add" data-quick-add autocomplete="off">
       <input name="q" placeholder="Add an item" enterkeyhint="done" aria-label="Add an item">
       <div class="suggest" hidden></div>
@@ -307,8 +360,9 @@ function openGrocery(g) {
   const body = `
     <div class="group-box form">
       <label>Item<input name="name" value="${esc(g.name)}" placeholder="e.g. Greek yogurt"></label>
-      <label>Usual store<input name="store" list="dl-stores" value="${esc(g.store)}" placeholder="Any store"></label>
     </div>
+    <h3>Usual store</h3>
+    <div class="chips wrap" role="radiogroup">${['', ...storeNames()].map((s) => `<label class="chip"><input type="radio" name="store" value="${esc(s)}" ${s === (g.store || '') ? 'checked' : ''}>${esc(s || 'Any store')}</label>`).join('')}${newChip('New store', 'store')}</div>
     <h3>Aisle</h3>
     <div class="chips wrap" role="radiogroup">${AISLES.map((a) => `<label class="chip"><input type="radio" name="aisle" value="${esc(a)}" ${a === g.aisle ? 'checked' : ''}>${esc(a)}</label>`).join('')}</div>
     <div class="actions">
@@ -316,6 +370,8 @@ function openGrocery(g) {
       <button type="button" class="btn primary" data-save>Save</button>
     </div>`;
   openSheet(isNew ? 'New item' : 'Edit item', body, (d) => {
+    $('[data-newchip=store]', d).onclick = (e) =>
+      openNewChip(e.currentTarget, 'Store name', async (v, input) => addRadioChip(input, 'store', await addStore(v)));
     const nameEl = $('[name=name]', d);
     let aisleTouched = !isNew;
     $$('[name=aisle]', d).forEach((r) => r.addEventListener('change', () => (aisleTouched = true)));
@@ -328,7 +384,7 @@ function openGrocery(g) {
     $('[data-save]', d).onclick = async () => {
       const name = nameEl.value.trim();
       if (!name) return toast('Name is required');
-      await write([{ store: 'groceries', put: { ...g, name, store: $('[name=store]', d).value.trim(), aisle: $('[name=aisle]:checked', d)?.value || 'Other' } }]);
+      await write([{ store: 'groceries', put: { ...g, name, store: $('[name=store]:checked', d)?.value || '', aisle: $('[name=aisle]:checked', d)?.value || 'Other' } }]);
       d.close();
       await reload();
     };
@@ -382,7 +438,8 @@ function renderWishlist() {
   const bought = S.wants.filter((w) => w.status === 'bought');
   const counts = {};
   for (const w of open) counts[w.category || 'Other'] = (counts[w.category || 'Other'] || 0) + 1;
-  const cats = WANT_CATEGORIES.filter((c) => counts[c]);
+  const allCats = wantCategories();
+  const cats = allCats.filter((c) => counts[c]);
   if (!['All', 'Bought', ...cats].includes(ui.wantFilter)) ui.wantFilter = 'All';
   const q = lc($('#want-search')?.value);
   const pool = ui.wantFilter === 'Bought' ? bought : ui.wantFilter === 'All' ? open : open.filter((w) => (w.category || 'Other') === ui.wantFilter);
@@ -418,7 +475,7 @@ function renderWishlist() {
   } else if (!shown.length) {
     listHtml = `<p class="empty small">${q ? 'No matches.' : 'Nothing here.'}</p>`;
   } else if (ui.wantFilter === 'All') {
-    listHtml = groupBy([...shown].sort((a, b) => WANT_CATEGORIES.indexOf(a.category) - WANT_CATEGORIES.indexOf(b.category)), (w) => w.category || 'Other')
+    listHtml = groupBy([...shown].sort((a, b) => allCats.indexOf(a.category || 'Other') - allCats.indexOf(b.category || 'Other')), (w) => w.category || 'Other')
       .map(([c, xs]) => `<section class="group"><h3>${esc(c)}</h3><ul class="list">${xs.sort(sortFn).map((w) => row(w, true)).join('')}</ul></section>`).join('');
   } else if (ui.wantFilter === 'Bought') {
     listHtml = `<ul class="list mt">${[...shown].sort((a, b) => (b.boughtAt || '').localeCompare(a.boughtAt || '')).map((w) => row(w, true)).join('')}</ul>`;
@@ -479,7 +536,7 @@ function openWant(w) {
       <label>Size / fit / color<input name="details" value="${esc(w.details)}" placeholder="e.g. L, 33x34 athletic, black"></label>
     </div>
     <h3>Category</h3>
-    <div class="chips wrap" role="radiogroup">${WANT_CATEGORIES.map((c) => `<label class="chip"><input type="radio" name="category" value="${c}" ${c === (w.category || 'Other') ? 'checked' : ''}>${c}</label>`).join('')}</div>
+    <div class="chips wrap" role="radiogroup">${wantCategories().map((c) => `<label class="chip"><input type="radio" name="category" value="${esc(c)}" ${c === (w.category || 'Other') ? 'checked' : ''}>${esc(c)}</label>`).join('')}${newChip('New category', 'category')}</div>
     <div class="group-box form">
       <div class="grid2">
         <label>Target price<input name="targetPrice" inputmode="decimal" value="${esc(w.targetPrice ?? '')}" placeholder="Optional"></label>
@@ -497,6 +554,8 @@ function openWant(w) {
       <button type="button" class="btn primary" data-save>Save</button>
     </div>`;
   openSheet(isNew ? 'New wish' : 'Edit wish', body, (d) => {
+    $('[data-newchip=category]', d).onclick = (e) =>
+      openNewChip(e.currentTarget, 'Category name', (v, input) => addRadioChip(input, 'category', v.replace(/^./, (c) => c.toUpperCase())));
     const setImage = (src) => {
       image = src;
       $('[data-img]', d).innerHTML = src ? `<img src="${esc(src)}" alt="">` : '<span>+ Photo</span>';
@@ -1033,8 +1092,54 @@ function render() {
   $('#backup-banner').hidden = !stale;
 }
 
+// ---------- sheet gestures ----------
+// Drag the grabber/header (or the content when it's scrolled to the top) down to close; tap the dimmed area to close.
+function wireSheetGestures() {
+  const d = sheet();
+  let startY, dy, dragging, tracking, startT;
+  d.addEventListener('touchstart', (e) => {
+    const body = e.target.closest('.sheet-body');
+    const onHandle = e.target.closest('.grabber, .sheet-head') && !e.target.closest('button');
+    const atTop = body && body.scrollTop <= 0 && !e.target.closest('input, textarea, select, .chips.scroll');
+    if (!onHandle && !atTop) return (tracking = false);
+    tracking = true;
+    dragging = !!onHandle;
+    startY = e.touches[0].clientY;
+    startT = Date.now();
+    dy = 0;
+  }, { passive: true });
+  d.addEventListener('touchmove', (e) => {
+    if (!tracking) return;
+    dy = e.touches[0].clientY - startY;
+    if (!dragging) {
+      if (dy > 8) dragging = true;
+      else if (dy < -4) return (tracking = false);
+      else return;
+    }
+    if (dy < 0) dy = 0;
+    e.preventDefault();
+    d.style.transition = 'none';
+    d.style.transform = `translateY(${dy}px)`;
+  }, { passive: false });
+  d.addEventListener('touchend', () => {
+    if (!tracking || !dragging) return (tracking = false);
+    tracking = dragging = false;
+    const fast = dy > 60 && Date.now() - startT < 250;
+    d.style.transition = 'transform .22s ease';
+    if (dy > 140 || fast) {
+      d.style.transform = 'translateY(100%)';
+      setTimeout(() => { d.close(); d.style.transform = ''; d.style.transition = ''; }, 200);
+    } else {
+      d.style.transform = '';
+    }
+  });
+  // A click on the <dialog> itself (not its contents) is a click on the backdrop.
+  d.addEventListener('click', (e) => { if (e.target === d) d.close(); });
+}
+
 // ---------- events ----------
 function wire() {
+  wireSheetGestures();
   $('#add-btn').innerHTML = ICON.plus;
   $('#settings-btn').innerHTML = ICON.gear;
   $('#tabs').onclick = (e) => {
@@ -1112,6 +1217,12 @@ function wire() {
       await setGrocery(g, { status: 'need' });
       return toast(`Added ${g.name}`);
     }
+    if (t('[data-newchip=store-filter]'))
+      return openNewChip(t('[data-newchip=store-filter]'), 'Store name', async (v) => {
+        ui.storeFilter = await addStore(v);
+        await reload();
+        toast(`Showing ${ui.storeFilter}`);
+      });
     if (t('[data-store-filter]')) return (ui.storeFilter = t('[data-store-filter]').dataset.storeFilter), render();
     if (t('[data-finish]')) return openFinish();
     if (t('[data-want-filter]')) return (ui.wantFilter = t('[data-want-filter]').dataset.wantFilter), render();
