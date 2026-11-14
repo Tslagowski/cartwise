@@ -127,11 +127,15 @@ function openSheet(title, body, wire, { full = false } = {}) {
 }
 function toast(msg, action) {
   const t = $('#toast');
+  // An open <dialog> sits in the browser's top layer, above everything in <body>,
+  // so show the toast inside whichever dialog is open or it would be hidden.
+  const host = $('#scanner').open ? $('#scanner') : sheet().open ? sheet() : document.body;
+  if (t.parentElement !== host) host.append(t);
   t.innerHTML = `<span>${esc(msg)}</span>` + (action ? ` <button type="button">${esc(action.label)}</button>` : '');
   if (action) t.querySelector('button').onclick = () => { t.classList.remove('show'); action.run(); };
   t.classList.add('show');
   clearTimeout(toast.t);
-  toast.t = setTimeout(() => t.classList.remove('show'), action ? 5000 : 2200);
+  toast.t = setTimeout(() => t.classList.remove('show'), Math.max(action ? 5000 : 2200, msg.length * 65));
 }
 
 // ---------- swipe to reveal ----------
@@ -522,12 +526,51 @@ function compressImage(src, max = 480) {
     img.src = src;
   });
 }
-// Free link preview (Microlink, no key; ~50 lookups/day). Only called when you tap the button.
+// Free link preview (Microlink, no key). Their free plan allows only a few lookups a day,
+// so we read the rate-limit headers and say plainly when it's used up and when it resets.
 async function linkPreview(url) {
-  const res = await fetch('https://api.microlink.io/?url=' + encodeURIComponent(url));
-  const json = await res.json();
-  if (json.status !== 'success') throw new Error('No preview for that link');
-  return { image: json.data?.image?.url || json.data?.logo?.url || '', title: json.data?.title || '' };
+  let res;
+  try {
+    res = await fetch('https://api.microlink.io/?url=' + encodeURIComponent(url));
+  } catch {
+    throw new Error('Couldn’t reach the photo lookup service. Check your connection.');
+  }
+  const json = await res.json().catch(() => ({}));
+  const left = res.headers.get('x-rate-limit-remaining');
+  const reset = Number(res.headers.get('x-rate-limit-reset'));
+  if (json.code === 'ERATE' || res.status === 429) {
+    const when = reset ? new Date(reset * 1000).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : 'tomorrow';
+    const err = new Error(`Free photo lookups are used up until ${when}. Copy the image on the site and tap Paste.`);
+    err.rate = true;
+    throw err;
+  }
+  if (json.status !== 'success') throw new Error(json.message ? `No photo: ${json.message}` : 'That page didn’t share a photo. Try Paste instead.');
+  return { image: json.data?.image?.url || json.data?.logo?.url || '', title: json.data?.title || '', left: left == null ? null : Number(left) };
+}
+
+// Paste an image copied from Safari (long-press the photo -> Copy). Free, no limits.
+async function pastedImage() {
+  if (!navigator.clipboard?.read) throw new Error('Pasting images isn’t supported here. Save the image and use + Photo.');
+  let items;
+  try {
+    items = await navigator.clipboard.read();
+  } catch {
+    throw new Error('Allow paste when asked, or save the image and use + Photo.');
+  }
+  for (const item of items) {
+    const type = item.types.find((t) => t.startsWith('image/'));
+    if (type) {
+      const url = URL.createObjectURL(await item.getType(type));
+      try { return await compressImage(url); } finally { URL.revokeObjectURL(url); }
+    }
+    if (item.types.includes('text/plain')) {
+      const text = (await (await item.getType('text/plain')).text()).trim();
+      if (/^https?:\/\/\S+\.(jpe?g|png|webp|gif|avif)(\?\S*)?$/i.test(text)) {
+        try { return await compressImage(text); } catch { return text; }
+      }
+    }
+  }
+  throw new Error('No image on the clipboard. Long-press the photo on the site and tap Copy.');
 }
 
 function openWant(w) {
@@ -551,8 +594,11 @@ function openWant(w) {
         <div><span class="lbl">Priority</span><div class="seg-toggle full" role="radiogroup">${['Low', 'Medium', 'High']
           .map((p) => `<label><input type="radio" name="priority" value="${p}" ${p === (w.priority || 'Medium') ? 'checked' : ''}><span>${p === 'Medium' ? 'Normal' : p === 'High' ? '★ Must' : 'Low'}</span></label>`).join('')}</div></div>
       </div>
-      <div class="barcode-row"><label class="grow">Link<input name="url" type="url" value="${esc(w.url)}" placeholder="https://"></label>
-        <button type="button" class="btn" data-fetch>Get photo</button></div>
+      <label>Link<input name="url" type="url" value="${esc(w.url)}" placeholder="https://"></label>
+      <div class="photo-actions">
+        <button type="button" class="btn" data-fetch>Get photo from link</button>
+        <button type="button" class="btn" data-paste>Paste photo</button>
+      </div>
       <label>Notes<textarea name="notes" rows="2" placeholder="e.g. wait for $40 deals">${esc(w.notes)}</textarea></label>
     </div>
     <input type="file" accept="image/*" hidden data-file>
@@ -592,11 +638,20 @@ function openWant(w) {
         setImage(img);
         const name = $('[name=name]', d);
         if (!name.value && pv.title) name.value = pv.title.split(/[|–-]/)[0].trim();
+        if (pv.left != null && pv.left <= 2) toast(pv.left ? `${pv.left} free photo lookup${pv.left === 1 ? '' : 's'} left today` : 'That was today’s last free photo lookup');
       } catch (err) {
-        toast(err.message || 'Couldn’t fetch a preview');
+        toast(err.message || 'Couldn’t fetch a preview', err.rate ? { label: 'Paste', run: () => $('[data-paste]', d)?.click() } : undefined);
       } finally {
         btn.disabled = false;
-        btn.textContent = 'Get photo';
+        btn.textContent = 'Get photo from link';
+      }
+    };
+    $('[data-paste]', d).onclick = async () => {
+      try {
+        setImage(await pastedImage());
+        haptic();
+      } catch (err) {
+        toast(err.message);
       }
     };
     const read = () => {

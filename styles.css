@@ -435,3 +435,9 @@ input, select, textarea { font-size: 15px; min-height: 38px; }
 html[data-text="small"] body { zoom: 0.9; }
 html[data-text="large"] body { zoom: 1.12; }
 .icon-btn:focus:not(:focus-visible), .sheet :focus:not(:focus-visible) { outline: none; }
+
+/* v0.4.3 photo buttons + longer toasts */
+.photo-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.photo-actions .btn { background: var(--card-2); }
+.toast { white-space: normal; text-align: left; border-radius: 16px; max-width: min(92vw, 420px); width: max-content; }
+.sheet .toast { bottom: calc(24px + env(safe-area-inset-bottom)); }

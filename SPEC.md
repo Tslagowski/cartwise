@@ -67,7 +67,7 @@ Just me, on an iPhone 14 Pro Max, in Safari or from the home screen.
   - `lines` {id, tripId, productId, price, qty, size, unit, onSale}
   - `wants` {id, name, brand, category, details, priority: Low|Medium|High, targetPrice?, url?, notes, image (data URL or https URL), status: open|bought, createdAt, boughtAt?, v}
   - `groceries` {id, name, qty, details, aisle, store, status: need|cart|stocked, lastBought?, createdAt, v}
-- **External services:** Microlink (`api.microlink.io`, free tier, no key, ~50 requests/day) only when "From link" is tapped on a wishlist item. Nothing else leaves the phone.
+- **External services:** Microlink (`api.microlink.io`, free tier, no key; as of 2026-11 the free plan allows only 5 lookups/day, reported in `x-rate-limit-*` headers) only when "From link" is tapped on a wishlist item. Nothing else leaves the phone.
 - **Vendored libraries:** `vendor/zxing.min.js` (@zxing/library 0.21.3, lazy-loaded for barcode scanning on iPhone, where Safari has no BarcodeDetector).
 - **Tests:** pure logic (unit conversion, stats, export/import shape) in `src/lib/`, tested with `node --test`, offline.
 
@@ -95,6 +95,7 @@ Organized like dedicated list apps (AnyList, Reminders, Bring!), not like the No
 - **v0.4.0:** grocery items get **Qty** (free text, e.g. "2 bags") and **Details** (type, brand, size, flavor). Names typed or imported as "Potatoes (gold/russet/sweet)" split into name + details; existing items are upgraded once (schema v3) and matching products are renamed so price history stays linked. Compact layout pass (smaller header, rows, chips; inputs stay at 16px so iOS doesn't zoom).
 - **v0.4.1:** smaller default text (15px body). iOS input auto-zoom is blocked with `maximum-scale=1` in the viewport (pinch-zoom still works in Safari), so inputs no longer need 16px. Settings → Text size (Smaller / Default / Larger) scales the whole UI with CSS zoom, saved per device.
 - **v0.4.2:** updates reliably on the Home Screen app: the service worker fetches with `cache: 'no-cache'` (GitHub Pages sends max-age=600), installs with `cache: 'reload'`, registers with `updateViaCache: 'none'`, checks for updates on launch, on returning to the foreground and every 30 minutes, and reloads once a new version takes over ("Updated to vX" toast).
+- **v0.4.3:** "Get photo from link" explains failures (rate limit with reset time, page without an image) and warns when 2 or fewer lookups are left. New "Paste photo" reads an image copied in Safari (long-press → Copy) from the clipboard — free and unlimited. Toasts now appear above open sheets (they were hidden behind the dialog's top layer).
 - **Migration:** on load, old records are upgraded (`groceries.status` need|cart|stocked + `aisle`; `wants.brand` + `category` from the old heading, with heading notes like "(wait for $40 deals)" moved into notes).
 
 ## 7. Acceptance criteria
