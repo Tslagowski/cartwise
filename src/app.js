@@ -298,12 +298,12 @@ function renderGroceries() {
   const row = (g) => {
     const st = statsForName(g.name);
     return swipeRow(
-      `<div class="cell tap ${g.status === 'cart' ? 'done' : ''}" data-gtoggle="${g.id}">
-        <span class="checkbox ${g.status === 'cart' ? 'on' : ''}" aria-hidden="true"></span>
-        <div class="grow"><div class="title">${g.qty ? `<span class="qty">${esc(g.qty)}</span>` : ''}${esc(g.name)}</div>${g.details ? `<div class="sub">${esc(g.details)}</div>` : ''}</div>
-        ${st ? `<span class="sub price">${formatMoney(st.last.price)}</span>` : ''}
+      `<div class="cell ${g.status === 'cart' ? 'done' : ''}">
+        <button type="button" class="check-hit" data-gtoggle="${g.id}" aria-label="${g.status === 'cart' ? 'Take out of cart' : 'Put in cart'}: ${esc(g.name)}" aria-pressed="${g.status === 'cart'}"><span class="checkbox ${g.status === 'cart' ? 'on' : ''}"></span></button>
+        <div class="grow tap" data-gopen="${g.id}"><div class="title">${g.qty ? `<span class="qty">${esc(g.qty)}</span>` : ''}${esc(g.name)}</div>${g.details ? `<div class="sub">${esc(g.details)}</div>` : ''}</div>
+        ${st ? `<span class="sub price tap" data-gopen="${g.id}">${formatMoney(st.last.price)}</span>` : ''}
       </div>`,
-      [{ act: 'gedit', label: 'Edit', cls: 'gray' }, { act: 'gremove', label: 'Remove', cls: 'red' }],
+      [{ act: 'gremove', label: 'Remove', cls: 'red' }],
       `data-gid="${g.id}"`
     );
   };
@@ -1113,7 +1113,7 @@ async function openSettings() {
       ${persisted ? '' : '<button type="button" class="btn" data-persist>Request persistent storage</button>'}
     </div>
     <h3>Tips</h3>
-    <div class="group-box form"><p class="sub">Tap a grocery item to put it in your cart. Swipe left on any row to see Edit, Remove, Bought or Delete. Nothing happens until you tap a button, and deletes can be undone.</p></div>
+    <div class="group-box form"><p class="sub">Tap the circle to put a grocery item in your cart; tap anywhere else on a row to edit it. Swipe left on a row to see Remove, Bought or Delete. Nothing happens until you tap a button, and deletes can be undone.</p></div>
     <p class="sub version">Cartwise v${window.CARTWISE_VERSION || ''} · ${S.trips.length} trips · ${S.products.length} items priced</p>`;
   openSheet('Settings', body, (d) => {
     $('[data-export]', d).onclick = exportData;
@@ -1294,6 +1294,7 @@ function wire() {
       haptic();
       return setGrocery(g, { status: g.status === 'cart' ? 'need' : 'cart' });
     }
+    if (t('[data-gopen]')) return openGrocery(S.groceries.find((x) => x.id === t('[data-gopen]').dataset.gopen));
     if (t('[data-usual]')) {
       const g = S.groceries.find((x) => x.id === t('[data-usual]').dataset.usual);
       haptic();

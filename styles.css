@@ -441,3 +441,8 @@ html[data-text="large"] body { zoom: 1.12; }
 .photo-actions .btn { background: var(--card-2); }
 .toast { white-space: normal; text-align: left; border-radius: 16px; max-width: min(92vw, 420px); width: max-content; }
 .sheet .toast { bottom: calc(24px + env(safe-area-inset-bottom)); }
+
+/* v0.4.5: circle toggles the cart, rest of the row edits */
+.check-hit { flex: none; display: flex; align-items: center; justify-content: center; width: 48px; align-self: stretch; margin: -7px 0 -7px -12px; padding: 0 0 0 4px; border: 0; background: none; cursor: pointer; }
+.check-hit:active .checkbox { transform: scale(0.85); }
+.cell .grow.tap { align-self: stretch; display: flex; flex-direction: column; justify-content: center; }
