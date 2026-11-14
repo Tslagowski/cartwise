@@ -78,6 +78,30 @@ function statsForName(name) {
   if (!ps.length) return null;
   return productStats(historyFor(ps.map((p) => p.id)));
 }
+// Price history for a grocery item: the same brand if it has one, otherwise any product with that name.
+function groceryStats(g) {
+  const ps = productsNamed(g.name);
+  if (!ps.length) return null;
+  const same = g.brand ? ps.filter((p) => lc(p.brand) === lc(g.brand)) : [];
+  return productStats(historyFor((same.length ? same : ps).map((p) => p.id)));
+}
+const variantLabel = (g) => [g.brand, g.details].filter(Boolean).join(' · ');
+// Keep an element at the same spot on screen across a re-render (no jumping while you tap).
+async function keepInPlace(selector, fn) {
+  const before = $(selector)?.getBoundingClientRect().top;
+  await fn();
+  const after = $(selector)?.getBoundingClientRect().top;
+  if (before == null || after == null) return;
+  const delta = after - before;
+  // On a short page there may be no room to scroll; add temporary space at the bottom so we can.
+  const short = scrollY + innerHeight + delta - document.body.scrollHeight;
+  if (short > 0) {
+    const main = $('#main');
+    main.style.minHeight = `${main.offsetHeight + short}px`;
+  }
+  window.scrollBy(0, delta);
+}
+
 function groupBy(items, key) {
   const m = new Map();
   for (const it of items) {
@@ -296,7 +320,7 @@ function renderGroceries() {
   const stores = groceryStores();
 
   const row = (g) => {
-    const st = statsForName(g.name);
+    const st = groceryStats(g);
     return swipeRow(
       `<div class="cell ${g.status === 'cart' ? 'done' : ''}">
         <button type="button" class="check-hit" data-gtoggle="${g.id}" aria-label="${g.status === 'cart' ? 'Take out of cart' : 'Put in cart'}: ${esc(g.name)}" aria-pressed="${g.status === 'cart'}"><span class="checkbox ${g.status === 'cart' ? 'on' : ''}"></span></button>
@@ -322,10 +346,10 @@ function renderGroceries() {
       ? byAisle(need).map(([a, xs]) => `<section class="group"><h3>${esc(a)}</h3><ul class="list">${xs.map(row).join('')}</ul></section>`).join('')
       : `<div class="empty">${S.groceries.length ? '<b>All set.</b><br>Nothing on your list. Add items above or tap your usuals below.' : 'Your grocery list is empty.<br><button class="btn ghost" data-notes-import="groceries">Paste a list from Notes</button>'}</div>`}
     ${cart.length ? `<section class="group"><h3>In cart · ${cart.length}</h3><ul class="list">${cart.map(row).join('')}</ul></section>` : ''}
-    ${usuals.length ? `<details class="usuals" ${need.length ? '' : 'open'}><summary>Your usuals · ${usuals.length}</summary>
+    ${usuals.length ? `<details class="usuals" ${(ui.usualsOpen ?? !need.length) ? 'open' : ''}><summary>Your usuals · ${usuals.length}</summary>
       <p class="sub hint-line">Tap to add back to your list.</p>
       ${byAisle(usuals).map(([a, xs]) => `<div class="usual-group"><div class="usual-aisle">${esc(a)}</div><div class="chips wrap">${xs
-        .map((g) => `<button class="chip" data-usual="${g.id}">${esc(g.name)}</button>`).join('')}</div></div>`).join('')}
+        .map((g) => `<button class="chip usual" data-usual="${g.id}"><span>${esc(g.name)}</span>${variantLabel(g) ? `<span class="chip-sub">${esc(variantLabel(g))}</span>` : ''}</button>`).join('')}</div></div>`).join('')}
     </details>` : ''}
     ${cart.length ? `<div class="actions sticky"><button class="btn primary" data-finish>Finish shopping · ${cart.length} in cart</button></div>` : ''}`;
 }
@@ -337,27 +361,52 @@ function wireQuickAdd() {
   const matches = () => {
     const q = lc(input.value);
     if (!q) return [];
-    return S.groceries.filter((g) => g.status !== 'need' && lc(g.name).includes(q)).slice(0, 6);
+    return S.groceries.filter((g) => g.status !== 'need' && [g.name, g.brand, g.details].some((x) => lc(x).includes(q))).slice(0, 6);
+  };
+  const showSuggest = (m, offerNew) => {
+    const typed = input.value.trim();
+    box.hidden = !m.length && !offerNew;
+    box.innerHTML = m.map((g) => `<button type="button" data-usual="${g.id}"><span>${esc(g.name)}${variantLabel(g) ? ` <span class="sub">${esc(variantLabel(g))}</span>` : ''}</span><span class="sub">${esc(g.aisle)}</span></button>`).join('')
+      + (offerNew && typed ? `<button type="button" class="new" data-quick-new>+ Add “${esc(typed)}” as a new item</button>` : '');
   };
   input.addEventListener('input', () => {
     const m = matches();
-    box.hidden = !m.length;
-    box.innerHTML = m.map((g) => `<button type="button" data-usual="${g.id}"><span>${esc(g.name)}${g.brand || g.details ? ` <span class="sub">${esc([g.brand, g.details].filter(Boolean).join(' · '))}</span>` : ''}</span><span class="sub">${esc(g.aisle)}</span></button>`).join('');
+    const typed = splitItemName(input.value.trim());
+    const exact = m.some((g) => lc(g.name) === lc(typed.name) && !variantLabel(g));
+    showSuggest(m, !!typed.name && !exact);
+  });
+  const addNew = async () => {
+    const { name, details } = splitItemName(input.value.trim());
+    if (!name) return;
+    await write([{ store: 'groceries', put: { id: newId(), name, brand: '', details, qty: '', aisle: aisleFor(name), store: ui.storeFilter, status: 'need', createdAt: new Date().toISOString(), v: SCHEMA } }]);
+    haptic();
+    await reload();
+    $('[data-quick-add] input')?.focus();
+  };
+  box.addEventListener('click', (e) => {
+    if (e.target.closest('[data-quick-new]')) { e.stopPropagation(); addNew(); }
   });
   form.onsubmit = async (e) => {
     e.preventDefault();
     const { name, details } = splitItemName(input.value.trim());
     if (!name) return;
-    const existing = S.groceries.find((g) => lc(g.name) === lc(name));
-    if (existing) {
-      if (existing.status === 'need') { toast('Already on your list'); input.value = ''; return; }
-      await write([{ store: 'groceries', put: { ...existing, status: 'need', details: details || existing.details || '' } }]);
-    } else {
-      await write([{ store: 'groceries', put: { id: newId(), name, details, qty: '', aisle: aisleFor(name), store: ui.storeFilter, status: 'need', createdAt: new Date().toISOString(), v: SCHEMA } }]);
+    // Same name can mean different items (brands, types). Only reuse one when it's unambiguous.
+    let same = S.groceries.filter((g) => lc(g.name) === lc(name));
+    if (details) same = same.filter((g) => lc(g.details) === lc(details) || lc(g.brand) === lc(details));
+    if (same.length > 1) {
+      const off = same.filter((g) => g.status !== 'need');
+      showSuggest(off, true);
+      return toast(off.length ? 'You have a few of these. Pick one, or add it as new.' : 'All of those are already on your list');
     }
-    haptic();
-    await reload();
-    $('[data-quick-add] input')?.focus();
+    if (same.length === 1) {
+      const g = same[0];
+      if (g.status === 'need') { toast(`${variantLabel(g) ? `${g.name} (${variantLabel(g)})` : g.name} is already on your list`, { label: 'Add another', run: addNew }); return; }
+      await write([{ store: 'groceries', put: { ...g, status: 'need' } }]);
+      haptic();
+      await reload();
+      return $('[data-quick-add] input')?.focus();
+    }
+    return addNew();
   };
 }
 
@@ -1048,8 +1097,9 @@ function openNotesImport(kind = 'wants') {
       const rows = parseChecklist(ta.value);
       if (!rows.length) return toast('No checklist items found');
       const now = new Date().toISOString();
-      const existing = new Set(S.groceries.map((g) => lc(g.name)));
-      rows.forEach((r) => (r.key = lc(splitItemName(r.name).name)));
+      const keyOf = (n, dt) => lc(n) + '|' + lc(dt);
+      const existing = new Set(S.groceries.map((g) => keyOf(g.name, g.details)));
+      rows.forEach((r) => { const sp = splitItemName(r.name); r.key = keyOf(sp.name, sp.details); });
       const ops = k() === 'wants'
         ? rows.map((r) => {
             const c = classifyWant(r.group, r.name);
@@ -1166,7 +1216,10 @@ function render() {
     s.focus();
     s.setSelectionRange(s.value.length, s.value.length);
   }
-  if (tab === 'groceries') wireQuickAdd();
+  if (tab === 'groceries') {
+    wireQuickAdd();
+    $('.usuals')?.addEventListener('toggle', (e) => (ui.usualsOpen = e.target.open));
+  }
   $('#title').textContent = TITLES[tab];
   document.title = `${TITLES[tab]} · Cartwise`;
   $('#add-btn').setAttribute('aria-label', ADD_LABEL[tab]);
@@ -1233,6 +1286,7 @@ function wire() {
     if (b.dataset.tab === tab) return window.scrollTo({ top: 0, behavior: 'smooth' });
     tab = b.dataset.tab;
     store('tab', tab);
+    $('#main').style.minHeight = '';
     render();
     window.scrollTo(0, 0);
   };
@@ -1299,9 +1353,15 @@ function wire() {
     if (t('[data-gopen]')) return openGrocery(S.groceries.find((x) => x.id === t('[data-gopen]').dataset.gopen));
     if (t('[data-usual]')) {
       const g = S.groceries.find((x) => x.id === t('[data-usual]').dataset.usual);
+      const fromChip = !!t('.usuals');
       haptic();
-      await setGrocery(g, { status: 'need' });
-      return toast(`Added ${g.name}`);
+      if (fromChip) ui.usualsOpen = true;
+      await keepInPlace(fromChip ? '.usuals' : '[data-quick-add]', async () => {
+        await write([{ store: 'groceries', put: { ...g, status: 'need' } }]);
+        await reload();
+      });
+      if (!fromChip) $('[data-quick-add] input')?.focus();
+      return toast(`Added ${variantLabel(g) ? `${g.name} · ${variantLabel(g)}` : g.name}`);
     }
     if (t('[data-newchip=store-filter]'))
       return openNewChip(t('[data-newchip=store-filter]'), 'Store name', async (v) => {
