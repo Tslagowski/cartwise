@@ -65,7 +65,7 @@ Just me, on an iPhone 14 Pro Max, in Safari or from the home screen.
   - `products` {id, name, brand, category, defaultSize, defaultUnit, barcode}
   - `trips` {id, storeId, date, note, createdAt}
   - `lines` {id, tripId, productId, price, qty, size, unit, onSale}
-  - `wants` {id, name, brand, category, details, priority: Low|Medium|High, targetPrice?, url?, notes, image (data URL or https URL), status: open|bought, createdAt, boughtAt?, v}
+  - `wants` {id, name, brand, category, details, priority: Low|Medium|High, targetPrice?, url?, notes, image (data URL or https URL), sitePrice?, sitePriceAt?, status: open|bought, createdAt, boughtAt?, v}
   - `groceries` {id, name, brand, qty, details, aisle, store, status: need|cart|stocked, lastBought?, createdAt, v}
 - **External services:** Microlink (`api.microlink.io`, free tier, no key; as of 2026-11 the free plan allows only 5 lookups/day, reported in `x-rate-limit-*` headers) only when "From link" is tapped on a wishlist item. Nothing else leaves the phone.
 - **Vendored libraries:** `vendor/zxing.min.js` (@zxing/library 0.21.3, lazy-loaded for barcode scanning on iPhone, where Safari has no BarcodeDetector).
@@ -101,6 +101,7 @@ Organized like dedicated list apps (AnyList, Reminders, Bring!), not like the No
 - **v0.4.6:** grocery items get a **Brand** field (suggestions from brands used anywhere in the app). Rows show "Brand · details"; logging prices from the cart pre-fills the brand.
 - **v0.4.7:** Your usuals stays open and in place while you tap several chips (scroll is compensated, with temporary bottom space on short lists). Usual chips and quick-add suggestions show brand · details. Items are identified by id, not name: quick-add only reuses an item when the name (plus details if typed) matches exactly one; otherwise it lists the matches plus "Add as a new item". Notes import de-dupes on name + details. Grocery row prices prefer the same brand's history.
 - **v0.4.8:** photo paste falls back to iPhone's native paste menu: if the clipboard API is refused or finds nothing, a "Long-press here, then tap Paste" box appears. Native paste events anywhere in the wish sheet accept image files, HTML containing an `<img>`, or an image URL; a pasted page URL fills Link. Text pastes into fields are left alone.
+- **v0.4.9:** "Get photo from link" tries Shopify first: `/products/<handle>.json` (CORS open on Shopify stores) gives photo (variant-aware), title, vendor, variant and current price with no lookup service and no limit; Microlink is the fallback for other sites. The site price is saved on the wish (`sitePrice`, `sitePriceAt`) and shown on its row. The photo picker accepts WebP/AVIF/HEIC explicitly, since images saved from shops may be hidden by a plain image/* filter.
 - **Migration:** on load, old records are upgraded (`groceries.status` need|cart|stocked + `aisle`; `wants.brand` + `category` from the old heading, with heading notes like "(wait for $40 deals)" moved into notes).
 
 ## 7. Acceptance criteria

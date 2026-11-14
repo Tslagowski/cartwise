@@ -522,7 +522,8 @@ function renderWishlist() {
 
   const row = (w, showBrand) => {
     const st = statsForName(w.name);
-    const sub = [showBrand && w.brand && `<b>${esc(w.brand)}</b>`, w.details && esc(w.details), st && `paid ${formatMoney(st.last.price)}`,
+    const sub = [showBrand && w.brand && `<b>${esc(w.brand)}</b>`, w.details && esc(w.details),
+      w.sitePrice != null && w.status !== 'bought' && `${formatMoney(w.sitePrice)} on site ${fmtShort(w.sitePriceAt)}`, st && `paid ${formatMoney(st.last.price)}`,
       w.status === 'bought' && w.boughtAt && `bought ${fmtShort(w.boughtAt.slice(0, 10))}`].filter(Boolean).join(' · ');
     return swipeRow(
       `<div class="cell tap" data-want="${w.id}">
@@ -587,6 +588,33 @@ function compressImage(src, max = 480) {
     img.src = src;
   });
 }
+// Shopify stores (Thursday Boots, True Classic, Allbirds, …) publish /products/<handle>.json
+// with CORS open, so we can read the photo, brand and current price directly. Free, no limit.
+async function shopifyLookup(url) {
+  let u;
+  try { u = new URL(url); } catch { return null; }
+  const m = u.pathname.match(/\/products\/([^/?#.]+)/);
+  if (!m) return null;
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 8000);
+  try {
+    const res = await fetch(`${u.origin}/products/${m[1]}.json`, { signal: ctrl.signal });
+    if (!res.ok) return null;
+    const p = (await res.json())?.product;
+    if (!p) return null;
+    const vid = u.searchParams.get('variant');
+    const variant = (vid && p.variants?.find((v) => String(v.id) === vid)) || p.variants?.[0];
+    const img = (variant?.image_id && p.images?.find((i) => i.id === variant.image_id)) || p.images?.[0] || p.image;
+    let image = img?.src || '';
+    if (image) { const iu = new URL(image); iu.searchParams.set('width', '600'); image = iu.toString(); }
+    return { image, title: p.title || '', brand: p.vendor || '', price: variant?.price != null ? Number(variant.price) : null, variant: variant?.title && variant.title !== 'Default Title' ? variant.title : '' };
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 // Free link preview (Microlink, no key). Their free plan allows only a few lookups a day,
 // so we read the rate-limit headers and say plainly when it's used up and when it resets.
 async function linkPreview(url) {
@@ -662,6 +690,7 @@ function openWant(w) {
   const isNew = !w;
   w = w || { id: newId(), status: 'open', createdAt: new Date().toISOString(), category: ui.wantFilter !== 'All' && ui.wantFilter !== 'Bought' ? ui.wantFilter : 'Other', priority: 'Medium', v: SCHEMA };
   let image = w.image || '';
+  let sitePrice = null;
   const body = `
     <div class="group-box form">
       <div class="name-row">
@@ -685,10 +714,10 @@ function openWant(w) {
         <button type="button" class="btn" data-paste>Paste photo</button>
       </div>
       <div class="paste-zone" contenteditable="true" inputmode="none" role="textbox" aria-label="Paste a photo here" data-paste-zone hidden></div>
-      <p class="sub paste-help" hidden>Long-press the box above and tap <b>Paste</b>. If a site won’t let you copy its photo, take a screenshot and use <b>+ Photo</b>.</p>
+      <p class="sub paste-help" hidden>Long-press the box above and tap <b>Paste</b>. Some sites block copying their photos. If nothing pastes, take a screenshot and use <b>+ Photo</b>.</p>
       <label>Notes<textarea name="notes" rows="2" placeholder="e.g. wait for $40 deals">${esc(w.notes)}</textarea></label>
     </div>
-    <input type="file" accept="image/*" hidden data-file>
+    <input type="file" accept="image/*,image/webp,image/avif,image/heic,image/heif,.webp,.avif,.heic,.jpg,.jpeg,.png,.gif" hidden data-file>
     <div class="actions">
       ${isNew ? '' : '<button type="button" class="btn danger" data-delete>Delete</button>'}
       ${!isNew && w.status !== 'bought' ? '<button type="button" class="btn" data-bought>Bought it</button>' : ''}
@@ -709,7 +738,7 @@ function openWant(w) {
       const f = e.target.files[0];
       if (!f) return;
       const url = URL.createObjectURL(f);
-      try { setImage(await compressImage(url)); } catch { toast('Couldn’t read that photo'); } finally { URL.revokeObjectURL(url); }
+      try { setImage(await compressImage(url)); } catch { toast(`Couldn’t read that photo${f.type ? ` (${f.type.replace('image/', '')})` : ''}. Try a screenshot of it instead.`); } finally { URL.revokeObjectURL(url); e.target.value = ''; }
     };
     $('[data-fetch]', d).onclick = async (e) => {
       const url = $('[name=url]', d).value.trim();
@@ -718,6 +747,18 @@ function openWant(w) {
       btn.disabled = true;
       btn.textContent = '…';
       try {
+        const shop = await shopifyLookup(url);
+        if (shop?.image) {
+          let img = shop.image;
+          try { img = await compressImage(shop.image); } catch {}
+          setImage(img);
+          const set = (n, v) => { const el = $(`[name=${n}]`, d); if (el && !el.value && v) el.value = v; };
+          set('name', shop.title);
+          set('brand', shop.brand);
+          set('details', shop.variant);
+          if (shop.price != null) { sitePrice = shop.price; toast(`Photo added · ${formatMoney(shop.price)} on the site today`); }
+          return;
+        }
         const pv = await linkPreview(url);
         if (!pv.image) throw new Error('No image on that page');
         let img = pv.image;
@@ -783,6 +824,7 @@ function openWant(w) {
         url: $('[name=url]', d).value.trim(),
         notes: $('[name=notes]', d).value.trim(),
         image,
+        ...(sitePrice != null ? { sitePrice, sitePriceAt: today() } : {}),
       };
     };
     $('[data-save]', d).onclick = async () => {
