@@ -66,7 +66,7 @@ Just me, on an iPhone 14 Pro Max, in Safari or from the home screen.
   - `trips` {id, storeId, date, note, createdAt}
   - `lines` {id, tripId, productId, price, qty, size, unit, onSale}
   - `wants` {id, name, brand, category, details, priority: Low|Medium|High, targetPrice?, url?, notes, image (data URL or https URL), status: open|bought, createdAt, boughtAt?, v}
-  - `groceries` {id, name, qty, details, aisle, store, status: need|cart|stocked, lastBought?, createdAt, v}
+  - `groceries` {id, name, brand, qty, details, aisle, store, status: need|cart|stocked, lastBought?, createdAt, v}
 - **External services:** Microlink (`api.microlink.io`, free tier, no key; as of 2026-11 the free plan allows only 5 lookups/day, reported in `x-rate-limit-*` headers) only when "From link" is tapped on a wishlist item. Nothing else leaves the phone.
 - **Vendored libraries:** `vendor/zxing.min.js` (@zxing/library 0.21.3, lazy-loaded for barcode scanning on iPhone, where Safari has no BarcodeDetector).
 - **Tests:** pure logic (unit conversion, stats, export/import shape) in `src/lib/`, tested with `node --test`, offline.
@@ -98,6 +98,7 @@ Organized like dedicated list apps (AnyList, Reminders, Bring!), not like the No
 - **v0.4.3:** "Get photo from link" explains failures (rate limit with reset time, page without an image) and warns when 2 or fewer lookups are left. New "Paste photo" reads an image copied in Safari (long-press → Copy) from the clipboard — free and unlimited. Toasts now appear above open sheets (they were hidden behind the dialog's top layer).
 - **v0.4.4:** "+ New aisle" in the grocery item sheet. Custom aisles live on the items that use them and sort after the built-in aisles, before Other.
 - **v0.4.5:** grocery rows match the wishlist: the circle (a wide tap target on the left edge) toggles the cart, tapping anywhere else opens Edit. Swipe left now only offers Remove.
+- **v0.4.6:** grocery items get a **Brand** field (suggestions from brands used anywhere in the app). Rows show "Brand · details"; logging prices from the cart pre-fills the brand.
 - **Migration:** on load, old records are upgraded (`groceries.status` need|cart|stocked + `aisle`; `wants.brand` + `category` from the old heading, with heading notes like "(wait for $40 deals)" moved into notes).
 
 ## 7. Acceptance criteria

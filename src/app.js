@@ -273,7 +273,7 @@ function renderDatalists() {
   const uniq = (xs) => [...new Set(xs.filter(Boolean))].sort((a, b) => a.localeCompare(b));
   const fill = (id, xs) => ($(id).innerHTML = uniq(xs).map((n) => `<option value="${esc(n)}">`).join(''));
   fill('#dl-products', [...S.products.map((p) => p.name), ...S.groceries.map((g) => g.name)]);
-  fill('#dl-brands', [...S.products.map((p) => p.brand), ...S.wants.map((w) => w.brand)]);
+  fill('#dl-brands', [...S.products.map((p) => p.brand), ...S.wants.map((w) => w.brand), ...S.groceries.map((g) => g.brand)]);
   fill('#dl-stores', [...S.stores.map((s) => s.name), ...S.groceries.map((g) => g.store)]);
   fill('#dl-categories', S.products.map((p) => p.category));
 }
@@ -300,7 +300,7 @@ function renderGroceries() {
     return swipeRow(
       `<div class="cell ${g.status === 'cart' ? 'done' : ''}">
         <button type="button" class="check-hit" data-gtoggle="${g.id}" aria-label="${g.status === 'cart' ? 'Take out of cart' : 'Put in cart'}: ${esc(g.name)}" aria-pressed="${g.status === 'cart'}"><span class="checkbox ${g.status === 'cart' ? 'on' : ''}"></span></button>
-        <div class="grow tap" data-gopen="${g.id}"><div class="title">${g.qty ? `<span class="qty">${esc(g.qty)}</span>` : ''}${esc(g.name)}</div>${g.details ? `<div class="sub">${esc(g.details)}</div>` : ''}</div>
+        <div class="grow tap" data-gopen="${g.id}"><div class="title">${g.qty ? `<span class="qty">${esc(g.qty)}</span>` : ''}${esc(g.name)}</div>${g.brand || g.details ? `<div class="sub">${[g.brand && `<b>${esc(g.brand)}</b>`, g.details && esc(g.details)].filter(Boolean).join(' · ')}</div>` : ''}</div>
         ${st ? `<span class="sub price tap" data-gopen="${g.id}">${formatMoney(st.last.price)}</span>` : ''}
       </div>`,
       [{ act: 'gremove', label: 'Remove', cls: 'red' }],
@@ -342,7 +342,7 @@ function wireQuickAdd() {
   input.addEventListener('input', () => {
     const m = matches();
     box.hidden = !m.length;
-    box.innerHTML = m.map((g) => `<button type="button" data-usual="${g.id}"><span>${esc(g.name)}${g.details ? ` <span class="sub">${esc(g.details)}</span>` : ''}</span><span class="sub">${esc(g.aisle)}</span></button>`).join('');
+    box.innerHTML = m.map((g) => `<button type="button" data-usual="${g.id}"><span>${esc(g.name)}${g.brand || g.details ? ` <span class="sub">${esc([g.brand, g.details].filter(Boolean).join(' · '))}</span>` : ''}</span><span class="sub">${esc(g.aisle)}</span></button>`).join('');
   });
   form.onsubmit = async (e) => {
     e.preventDefault();
@@ -369,13 +369,14 @@ async function setGrocery(g, patch, undoMsg) {
 
 function openGrocery(g) {
   const isNew = !g;
-  g = g || { id: newId(), name: '', details: '', qty: '', aisle: 'Other', store: ui.storeFilter, status: 'need', createdAt: new Date().toISOString(), v: SCHEMA };
+  g = g || { id: newId(), name: '', brand: '', details: '', qty: '', aisle: 'Other', store: ui.storeFilter, status: 'need', createdAt: new Date().toISOString(), v: SCHEMA };
   const body = `
     <div class="group-box form">
       <div class="name-qty">
         <label class="grow">Item<input name="name" value="${esc(g.name)}" placeholder="e.g. Potatoes"></label>
         <label class="qty-field">Qty<input name="qty" value="${esc(g.qty)}" placeholder="1" autocomplete="off"></label>
       </div>
+      <label>Brand<input name="brand" list="dl-brands" value="${esc(g.brand)}" placeholder="e.g. Fage, Kirkland, any" autocomplete="off"></label>
       <label>Details<textarea name="details" rows="2" placeholder="Type, brand, size, flavor… e.g. gold or russet, 5 lb bag">${esc(g.details)}</textarea></label>
     </div>
     <h3>Usual store</h3>
@@ -406,7 +407,7 @@ function openGrocery(g) {
     $('[data-save]', d).onclick = async () => {
       const name = nameEl.value.trim();
       if (!name) return toast('Name is required');
-      await write([{ store: 'groceries', put: { ...g, name, qty: $('[name=qty]', d).value.trim(), details: $('[name=details]', d).value.trim(), store: $('[name=store]:checked', d)?.value || '', aisle: $('[name=aisle]:checked', d)?.value || 'Other' } }]);
+      await write([{ store: 'groceries', put: { ...g, name, brand: $('[name=brand]', d).value.trim(), qty: $('[name=qty]', d).value.trim(), details: $('[name=details]', d).value.trim(), store: $('[name=store]:checked', d)?.value || '', aisle: $('[name=aisle]:checked', d)?.value || 'Other' } }]);
       d.close();
       await reload();
     };
@@ -443,8 +444,9 @@ function openFinish() {
       openPurchase({
         storeName: ui.storeFilter || (stores.length === 1 ? stores[0] : undefined),
         prefill: cart.map((g) => {
-          const p = productsNamed(g.name)[0];
-          return { name: g.name, brand: p?.brand, size: p?.defaultSize, unit: p?.defaultUnit, barcode: p?.barcode };
+          const ps = productsNamed(g.name);
+          const p = (g.brand && ps.find((x) => lc(x.brand) === lc(g.brand))) || ps[0];
+          return { name: g.name, brand: g.brand || p?.brand, size: p?.defaultSize, unit: p?.defaultUnit, barcode: p?.barcode };
         }),
         onSaved: ({ storeName }) => done(storeName),
       });
