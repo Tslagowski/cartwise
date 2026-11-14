@@ -459,3 +459,8 @@ html[data-text="large"] body { zoom: 1.12; }
 .paste-zone[hidden], .paste-help[hidden] { display: none; }
 .paste-zone:focus { border-style: solid; }
 .paste-zone img { max-height: 60px; }
+
+/* v0.5.0: the paste target is the button */
+.photo-actions .paste-zone { min-height: 38px; border-radius: 12px; border: 0; background: var(--card-2); color: var(--accent); font-size: 14px; font-weight: 600; text-align: center; padding: 0 8px; }
+.photo-actions .paste-zone:empty::before { content: "Hold to paste photo"; color: var(--accent); }
+.photo-actions .paste-zone:focus { box-shadow: 0 0 0 2px var(--accent); }

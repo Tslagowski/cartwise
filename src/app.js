@@ -629,7 +629,7 @@ async function linkPreview(url) {
   const reset = Number(res.headers.get('x-rate-limit-reset'));
   if (json.code === 'ERATE' || res.status === 429) {
     const when = reset ? new Date(reset * 1000).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : 'tomorrow';
-    const err = new Error(`Free photo lookups are used up until ${when}. Copy the image on the site and tap Paste.`);
+    const err = new Error(`Free photo lookups are used up until ${when}. Copy the photo on the site, then hold the paste button.`);
     err.rate = true;
     throw err;
   }
@@ -661,30 +661,6 @@ async function fromPasteEvent(e) {
   return null;
 }
 
-// Paste an image copied from Safari (long-press the photo -> Copy). Free, no limits.
-async function pastedImage() {
-  if (!navigator.clipboard?.read) throw new Error('Pasting images isn’t supported here. Save the image and use + Photo.');
-  let items;
-  try {
-    items = await navigator.clipboard.read();
-  } catch {
-    throw new Error('Allow paste when asked, or save the image and use + Photo.');
-  }
-  for (const item of items) {
-    const type = item.types.find((t) => t.startsWith('image/'));
-    if (type) {
-      const url = URL.createObjectURL(await item.getType(type));
-      try { return await compressImage(url); } finally { URL.revokeObjectURL(url); }
-    }
-    if (item.types.includes('text/plain')) {
-      const text = (await (await item.getType('text/plain')).text()).trim();
-      if (/^https?:\/\/\S+\.(jpe?g|png|webp|gif|avif)(\?\S*)?$/i.test(text)) {
-        try { return await compressImage(text); } catch { return text; }
-      }
-    }
-  }
-  throw new Error('No image on the clipboard. Long-press the photo on the site and tap Copy.');
-}
 
 function openWant(w) {
   const isNew = !w;
@@ -711,10 +687,8 @@ function openWant(w) {
       <label>Link<input name="url" type="url" value="${esc(w.url)}" placeholder="https://"></label>
       <div class="photo-actions">
         <button type="button" class="btn" data-fetch>Get photo from link</button>
-        <button type="button" class="btn" data-paste>Paste photo</button>
+        <div class="paste-zone" contenteditable="true" inputmode="none" enterkeyhint="done" role="textbox" aria-label="Hold to paste a copied photo" data-paste-zone></div>
       </div>
-      <div class="paste-zone" contenteditable="true" inputmode="none" role="textbox" aria-label="Paste a photo here" data-paste-zone hidden></div>
-      <p class="sub paste-help" hidden>Long-press the box above and tap <b>Paste</b>. Some sites block copying their photos. If nothing pastes, take a screenshot and use <b>+ Photo</b>.</p>
       <label>Notes<textarea name="notes" rows="2" placeholder="e.g. wait for $40 deals">${esc(w.notes)}</textarea></label>
     </div>
     <input type="file" accept="image/*,image/webp,image/avif,image/heic,image/heif,.webp,.avif,.heic,.jpg,.jpeg,.png,.gif" hidden data-file>
@@ -768,7 +742,7 @@ function openWant(w) {
         if (!name.value && pv.title) name.value = pv.title.split(/[|–-]/)[0].trim();
         if (pv.left != null && pv.left <= 2) toast(pv.left ? `${pv.left} free photo lookup${pv.left === 1 ? '' : 's'} left today` : 'That was today’s last free photo lookup');
       } catch (err) {
-        toast(err.message || 'Couldn’t fetch a preview', err.rate ? { label: 'Paste', run: () => $('[data-paste]', d)?.click() } : undefined);
+        toast(err.message || 'Couldn’t fetch a preview');
       } finally {
         btn.disabled = false;
         btn.textContent = 'Get photo from link';
@@ -776,13 +750,8 @@ function openWant(w) {
     };
     // Native paste (long-press -> Paste) anywhere in the sheet, including the paste box.
     const zone = $('[data-paste-zone]', d);
-    const showZone = () => {
-      zone.hidden = false;
-      $('.paste-help', d).hidden = false;
-      zone.focus();
-    };
     const usePasted = async (r) => {
-      if (r?.image) { setImage(r.image); zone.hidden = true; $('.paste-help', d).hidden = true; haptic(); toast('Photo added'); return true; }
+      if (r?.image) { setImage(r.image); zone.blur(); haptic(); toast('Photo added'); return true; }
       if (r?.link) {
         const url = $('[name=url]', d);
         if (!url.value) url.value = r.link;
@@ -799,18 +768,11 @@ function openWant(w) {
       e.preventDefault();
       const r = await fromPasteEvent(e);
       zone.textContent = '';
-      if (!(await usePasted(r)) && !inField) toast('No photo on the clipboard. On the site, long-press the photo and tap Copy.');
+      if (!(await usePasted(r)) && !inField) toast('No photo was copied. Some sites block copying photos; take a screenshot and use + Photo.');
     });
+    // Typing does nothing here; it's only a paste target.
+    zone.addEventListener('beforeinput', (e) => { if (e.inputType !== 'insertFromPaste') e.preventDefault(); });
     zone.addEventListener('input', () => (zone.textContent = ''));
-    $('[data-paste]', d).onclick = async () => {
-      try {
-        setImage(await pastedImage());
-        haptic();
-      } catch {
-        // Clipboard API refused or found nothing — fall back to iPhone's own paste menu.
-        showZone();
-      }
-    };
     const read = () => {
       const tp = $('[name=targetPrice]', d).value.replace(/[$,\s]/g, '');
       return {
