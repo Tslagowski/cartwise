@@ -609,6 +609,30 @@ async function linkPreview(url) {
   return { image: json.data?.image?.url || json.data?.logo?.url || '', title: json.data?.title || '', left: left == null ? null : Number(left) };
 }
 
+const IMG_URL = /^https?:\/\/\S+\.(jpe?g|png|webp|gif|avif|heic)(\?\S*)?$/i;
+// Read a native paste event (the most reliable way on iPhone). Returns { image } or { link } or null.
+async function fromPasteEvent(e) {
+  const cd = e.clipboardData;
+  if (!cd) return null;
+  for (const item of cd.items || []) {
+    if (item.kind === 'file' && item.type.startsWith('image/')) {
+      const file = item.getAsFile();
+      if (!file) continue;
+      const url = URL.createObjectURL(file);
+      try { return { image: await compressImage(url) }; } finally { URL.revokeObjectURL(url); }
+    }
+  }
+  const html = cd.getData('text/html');
+  const src = html && new DOMParser().parseFromString(html, 'text/html').querySelector('img[src]')?.src;
+  const text = (cd.getData('text/uri-list') || cd.getData('text/plain') || '').trim().split(/\s+/)[0];
+  const imgUrl = (src && /^https?:/.test(src) && src) || (IMG_URL.test(text) && text);
+  if (imgUrl) {
+    try { return { image: await compressImage(imgUrl) }; } catch { return { image: imgUrl }; }
+  }
+  if (/^https?:\/\//.test(text)) return { link: text };
+  return null;
+}
+
 // Paste an image copied from Safari (long-press the photo -> Copy). Free, no limits.
 async function pastedImage() {
   if (!navigator.clipboard?.read) throw new Error('Pasting images isn’t supported here. Save the image and use + Photo.');
@@ -660,6 +684,8 @@ function openWant(w) {
         <button type="button" class="btn" data-fetch>Get photo from link</button>
         <button type="button" class="btn" data-paste>Paste photo</button>
       </div>
+      <div class="paste-zone" contenteditable="true" inputmode="none" role="textbox" aria-label="Paste a photo here" data-paste-zone hidden></div>
+      <p class="sub paste-help" hidden>Long-press the box above and tap <b>Paste</b>. If a site won’t let you copy its photo, take a screenshot and use <b>+ Photo</b>.</p>
       <label>Notes<textarea name="notes" rows="2" placeholder="e.g. wait for $40 deals">${esc(w.notes)}</textarea></label>
     </div>
     <input type="file" accept="image/*" hidden data-file>
@@ -707,12 +733,41 @@ function openWant(w) {
         btn.textContent = 'Get photo from link';
       }
     };
+    // Native paste (long-press -> Paste) anywhere in the sheet, including the paste box.
+    const zone = $('[data-paste-zone]', d);
+    const showZone = () => {
+      zone.hidden = false;
+      $('.paste-help', d).hidden = false;
+      zone.focus();
+    };
+    const usePasted = async (r) => {
+      if (r?.image) { setImage(r.image); zone.hidden = true; $('.paste-help', d).hidden = true; haptic(); toast('Photo added'); return true; }
+      if (r?.link) {
+        const url = $('[name=url]', d);
+        if (!url.value) url.value = r.link;
+        toast('That’s a page link, not a photo. Tap “Get photo from link”.');
+        return true;
+      }
+      return false;
+    };
+    $('form', d).addEventListener('paste', async (e) => {
+      const inField = e.target.closest('input, textarea');
+      // Let normal text pastes into fields through; grab images (and anything pasted in the box).
+      const hasImage = [...(e.clipboardData?.items || [])].some((i) => i.kind === 'file' && i.type.startsWith('image/'));
+      if (inField && !hasImage) return;
+      e.preventDefault();
+      const r = await fromPasteEvent(e);
+      zone.textContent = '';
+      if (!(await usePasted(r)) && !inField) toast('No photo on the clipboard. On the site, long-press the photo and tap Copy.');
+    });
+    zone.addEventListener('input', () => (zone.textContent = ''));
     $('[data-paste]', d).onclick = async () => {
       try {
         setImage(await pastedImage());
         haptic();
-      } catch (err) {
-        toast(err.message);
+      } catch {
+        // Clipboard API refused or found nothing — fall back to iPhone's own paste menu.
+        showZone();
       }
     };
     const read = () => {

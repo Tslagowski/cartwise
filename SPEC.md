@@ -100,6 +100,7 @@ Organized like dedicated list apps (AnyList, Reminders, Bring!), not like the No
 - **v0.4.5:** grocery rows match the wishlist: the circle (a wide tap target on the left edge) toggles the cart, tapping anywhere else opens Edit. Swipe left now only offers Remove.
 - **v0.4.6:** grocery items get a **Brand** field (suggestions from brands used anywhere in the app). Rows show "Brand · details"; logging prices from the cart pre-fills the brand.
 - **v0.4.7:** Your usuals stays open and in place while you tap several chips (scroll is compensated, with temporary bottom space on short lists). Usual chips and quick-add suggestions show brand · details. Items are identified by id, not name: quick-add only reuses an item when the name (plus details if typed) matches exactly one; otherwise it lists the matches plus "Add as a new item". Notes import de-dupes on name + details. Grocery row prices prefer the same brand's history.
+- **v0.4.8:** photo paste falls back to iPhone's native paste menu: if the clipboard API is refused or finds nothing, a "Long-press here, then tap Paste" box appears. Native paste events anywhere in the wish sheet accept image files, HTML containing an `<img>`, or an image URL; a pasted page URL fills Link. Text pastes into fields are left alone.
 - **Migration:** on load, old records are upgraded (`groceries.status` need|cart|stocked + `aisle`; `wants.brand` + `category` from the old heading, with heading notes like "(wait for $40 deals)" moved into notes).
 
 ## 7. Acceptance criteria
