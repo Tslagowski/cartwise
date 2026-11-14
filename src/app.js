@@ -216,6 +216,11 @@ function wantCategories() {
   const custom = [...new Set(S.wants.map((w) => w.category).filter((c) => c && !WANT_CATEGORIES.includes(c)))].sort();
   return [...WANT_CATEGORIES.filter((c) => c !== 'Other'), ...custom, 'Other'];
 }
+// Grocery aisles = the defaults plus any you've created (kept on the items that use them).
+function groceryAisles() {
+  const custom = [...new Set(S.groceries.map((g) => g.aisle).filter((a) => a && !AISLES.includes(a)))].sort();
+  return [...AISLES.filter((a) => a !== 'Other'), ...custom, 'Other'];
+}
 // Grocery stores = stores you've added or shopped at, plus any set on items.
 function storeNames() {
   return [...new Set([...S.stores.map((s) => s.name), ...S.groceries.map((g) => g.store)].filter(Boolean))].sort((a, b) => a.localeCompare(b));
@@ -277,8 +282,8 @@ function renderDatalists() {
 // GROCERIES — one list sorted by store aisle, quick add, usuals, cart
 // =====================================================================
 const aisleIndex = (a) => {
-  const i = AISLES.indexOf(a);
-  return i < 0 ? AISLES.length : i;
+  const i = groceryAisles().indexOf(a || 'Other');
+  return i < 0 ? 999 : i;
 };
 const groceryStores = () => storeNames();
 const inStoreFilter = (g) => !ui.storeFilter || !g.store || g.store === ui.storeFilter;
@@ -376,12 +381,17 @@ function openGrocery(g) {
     <h3>Usual store</h3>
     <div class="chips wrap" role="radiogroup">${['', ...storeNames()].map((s) => `<label class="chip"><input type="radio" name="store" value="${esc(s)}" ${s === (g.store || '') ? 'checked' : ''}>${esc(s || 'Any store')}</label>`).join('')}${newChip('New store', 'store')}</div>
     <h3>Aisle</h3>
-    <div class="chips wrap" role="radiogroup">${AISLES.map((a) => `<label class="chip"><input type="radio" name="aisle" value="${esc(a)}" ${a === g.aisle ? 'checked' : ''}>${esc(a)}</label>`).join('')}</div>
+    <div class="chips wrap" role="radiogroup">${groceryAisles().map((a) => `<label class="chip"><input type="radio" name="aisle" value="${esc(a)}" ${a === (g.aisle || 'Other') ? 'checked' : ''}>${esc(a)}</label>`).join('')}${newChip('New aisle', 'aisle')}</div>
     <div class="actions">
       ${isNew ? '' : '<button type="button" class="btn danger" data-delete>Delete item</button>'}
       <button type="button" class="btn primary" data-save>Save</button>
     </div>`;
   openSheet(isNew ? 'New item' : 'Edit item', body, (d) => {
+    $('[data-newchip=aisle]', d).onclick = (e) =>
+      openNewChip(e.currentTarget, 'Aisle name', (v, input) => {
+        addRadioChip(input, 'aisle', v.replace(/^./, (c) => c.toUpperCase()));
+        aisleTouched = true;
+      });
     $('[data-newchip=store]', d).onclick = (e) =>
       openNewChip(e.currentTarget, 'Store name', async (v, input) => addRadioChip(input, 'store', await addStore(v)));
     const nameEl = $('[name=name]', d);

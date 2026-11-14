@@ -96,6 +96,7 @@ Organized like dedicated list apps (AnyList, Reminders, Bring!), not like the No
 - **v0.4.1:** smaller default text (15px body). iOS input auto-zoom is blocked with `maximum-scale=1` in the viewport (pinch-zoom still works in Safari), so inputs no longer need 16px. Settings → Text size (Smaller / Default / Larger) scales the whole UI with CSS zoom, saved per device.
 - **v0.4.2:** updates reliably on the Home Screen app: the service worker fetches with `cache: 'no-cache'` (GitHub Pages sends max-age=600), installs with `cache: 'reload'`, registers with `updateViaCache: 'none'`, checks for updates on launch, on returning to the foreground and every 30 minutes, and reloads once a new version takes over ("Updated to vX" toast).
 - **v0.4.3:** "Get photo from link" explains failures (rate limit with reset time, page without an image) and warns when 2 or fewer lookups are left. New "Paste photo" reads an image copied in Safari (long-press → Copy) from the clipboard — free and unlimited. Toasts now appear above open sheets (they were hidden behind the dialog's top layer).
+- **v0.4.4:** "+ New aisle" in the grocery item sheet. Custom aisles live on the items that use them and sort after the built-in aisles, before Other.
 - **Migration:** on load, old records are upgraded (`groceries.status` need|cart|stocked + `aisle`; `wants.brand` + `category` from the old heading, with heading notes like "(wait for $40 deals)" moved into notes).
 
 ## 7. Acceptance criteria

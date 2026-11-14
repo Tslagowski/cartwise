@@ -1,5 +1,5 @@
 // Bump VERSION on every deploy so phones pick up the new files.
-const VERSION = 'cartwise-v0.4.3';
+const VERSION = 'cartwise-v0.4.4';
 const SHELL = [
   './',
   './index.html',
