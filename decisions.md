@@ -25,6 +25,7 @@ Running log from grill sessions. One row per question answered. Big or hard-to-r
 | 16 | 2026-11-14 | What next after the redesign? | My sizes per brand and running-low suggestions | Chosen by the user | |
 | 17 | 2026-11-14 | Price-drop alerts for wishes? | Not now | Only works for Shopify links; many wish links aren't Shopify | |
 | 18 | 2026-11-14 | Receipt scanning? | Later, maybe | Most grocery trips are pickup; only Walmart/Costco in person, and Costco prices are steady | |
+| 19 | 2026-11-14 | How should the wishlist be ordered? | Default to My order (drag to arrange) with standard sorts and a group-by choice | User wants to rank wishes in the order they want them, plus price/date/brand sorts | |
 
 ## Superseded
 Decisions that were later changed. Keep them, so agents don't re-propose them.

@@ -481,3 +481,18 @@ html[data-text="large"] body { zoom: 1.12; }
 .size-row { display: flex; flex-direction: column; gap: 4px; }
 .chip-x { border: 0; background: none; color: inherit; font-size: 16px; line-height: 1; padding: 0 0 0 6px; margin-right: -4px; }
 .size-chips .chip:not(.saved):not(.add-chip) { background: var(--card-2); }
+
+/* v0.7.0: wishlist sorting + drag */
+.sort-btn { flex: none; max-width: 46%; padding: 0 10px; background: var(--card); }
+.sort-btn span { overflow: hidden; text-overflow: ellipsis; }
+.sort-btn svg { width: 16px; height: 16px; flex: none; }
+.radio-list { padding: 0; }
+.radio-row { display: flex; align-items: center; gap: 10px; padding: 11px 14px; color: var(--text); font-size: 15px; margin: 0; }
+.radio-row + .radio-row { border-top: 0.5px solid var(--line); }
+.radio-row .sub { margin-left: auto; }
+.drag-handle { flex: none; display: flex; align-items: center; justify-content: center; width: 36px; align-self: stretch; margin: -7px -8px -7px 0; color: var(--muted); touch-action: none; cursor: grab; }
+.drag-handle svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; }
+.drag-active li.swipe { transition: transform 0.15s ease; }
+.drag-active li.swipe.dragging { transition: none; z-index: 5; position: relative; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3); }
+li.swipe.dragging .swipe-content { background: var(--card-2); }
+.drag-active li + li::before { display: none; }

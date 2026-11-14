@@ -65,7 +65,7 @@ Just me, on an iPhone 14 Pro Max, in Safari or from the home screen.
   - `products` {id, name, brand, category, defaultSize, defaultUnit, barcode}
   - `trips` {id, storeId, date, note, createdAt}
   - `lines` {id, tripId, productId, price, qty, size, unit, onSale}
-  - `wants` {id, name, brand, category, details, priority: Low|Medium|High, targetPrice?, url?, notes, image (data URL or https URL), sitePrice?, sitePriceAt?, status: open|bought, createdAt, boughtAt?, v}
+  - `wants` {id, name, brand, category, details, priority: Low|Medium|High, rank?, targetPrice?, url?, notes, image (data URL or https URL), sitePrice?, sitePriceAt?, status: open|bought, createdAt, boughtAt?, v}
   - `settings` {id, value} — `brandSizes`: { [brand lowercase]: { brand, sizes: [string] } }
   - `groceries` {id, name, brand, qty, details, boughtDates?, snoozeUntil?, aisle, store, status: need|cart|stocked, lastBought?, createdAt, v}
 - **External services:** Microlink (`api.microlink.io`, free tier, no key; as of 2026-11 the free plan allows only 5 lookups/day, reported in `x-rate-limit-*` headers) only when "From link" is tapped on a wishlist item. Nothing else leaves the phone.
@@ -109,6 +109,7 @@ Organized like dedicated list apps (AnyList, Reminders, Bring!), not like the No
   - **Running low:** a card at the top of Groceries suggests usuals that are due, based on the median gap between purchase dates (logged trips with the same name/brand, plus days you finished shopping with the item in the cart; `groceries.boughtDates`, last 12). Needs 2+ dates. Add, Add all, or swipe → Not now (snoozes for half the usual gap, min 2 days; `snoozeUntil`).
   - **My sizes:** sizes saved per brand (`settings` store, id `brandSizes`). In the wish sheet, picking a brand shows your saved sizes plus sizes used on other wishes from that brand; tap to use, "+ Save … as my size" to keep one; a single saved size fills in automatically. Settings → My sizes lists, adds and removes them.
   - IndexedDB v2 adds the `settings` store; backups include it, older backups still import.
+- **v0.7.0 — wishlist sorting:** a sort button beside search opens Sort by (My order, Priority, Price low→high / high→low, Newest, Oldest, Brand A–Z, Name A–Z) and Group by (Category, Brand, None); both are remembered per device. Price = target price, else store price, else last paid; unpriced items go last. In My order, rows get a ≡ handle (pointer events, works with touch and mouse) to drag within a section, and swipe → Top moves a wish to the top. Order is stored as `wants.rank` (spaced by 1024, new wishes go to the bottom, existing wishes get ranks the first time you arrange).
 - **Migration:** on load, old records are upgraded (`groceries.status` need|cart|stocked + `aisle`; `wants.brand` + `category` from the old heading, with heading notes like "(wait for $40 deals)" moved into notes).
 
 ## 7. Acceptance criteria

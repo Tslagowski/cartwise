@@ -9,6 +9,7 @@ import { migrateAll, SCHEMA, splitItemName } from './lib/migrate.js';
 import { scanBarcode } from './scanner.js';
 import { runningLow, addBoughtDate } from './lib/restock.js';
 import { addSize, removeSize, sizeSuggestions } from './lib/sizes.js';
+import { SORTS, GROUPS, sortWants, rankBetween, normalizeRanks } from './lib/wantsort.js';
 
 // ---------- state ----------
 let S = { stores: [], products: [], trips: [], lines: [], wants: [], groceries: [], settings: [] };
@@ -163,6 +164,8 @@ const ICON = {
   gear: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3 1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8 1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>',
   scan: '<svg viewBox="0 0 24 24"><path d="M4 7V5a1 1 0 0 1 1-1h2M17 4h2a1 1 0 0 1 1 1v2M20 17v2a1 1 0 0 1-1 1h-2M7 20H5a1 1 0 0 1-1-1v-2M8 8v8M11 8v8M14 8v8M17 8v8"/></svg>',
   star: '<svg viewBox="0 0 24 24" class="fill"><path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.3-4.1 5.9-.9z"/></svg>',
+  sort: '<svg viewBox="0 0 24 24"><path d="M7 4v16M3 8l4-4 4 4M17 20V4M13 16l4 4 4-4"/></svg>',
+  grip: '<svg viewBox="0 0 24 24"><path d="M5 9h14M5 15h14"/></svg>',
   link: '<svg viewBox="0 0 24 24"><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></svg>',
 };
 
@@ -223,7 +226,7 @@ function enableSwipe(root) {
   let row, content, width, startX, startY, base, dx, locked;
   root.addEventListener('touchstart', (e) => {
     const r = e.target.closest('.swipe');
-    if (!r || e.target.closest('.swipe-actions')) return;
+    if (!r || e.target.closest('.swipe-actions, [data-drag]')) return;
     if (openRow && openRow !== r) closeOpenRow();
     row = r;
     content = r.querySelector('.swipe-content');
@@ -572,8 +575,16 @@ function renderWishlist() {
   const q = lc($('#want-search')?.value);
   const pool = ui.wantFilter === 'Bought' ? bought : ui.wantFilter === 'All' ? open : open.filter((w) => (w.category || 'Other') === ui.wantFilter);
   const shown = pool.filter((w) => !q || [w.name, w.brand, w.details, w.notes].some((x) => lc(x).includes(q)));
-  const order = { High: 0, Medium: 1, Low: 2 };
-  const sortFn = (a, b) => (order[a.priority] ?? 1) - (order[b.priority] ?? 1) || a.name.localeCompare(b.name);
+  const sort = store('wantSort') || 'custom';
+  const groupMode = store('wantGroup') || 'category';
+  const paid = (w) => statsForName(w.name)?.last.price ?? null;
+  const sorted = ui.wantFilter === 'Bought' && sort === 'custom'
+    ? [...shown].sort((a, b) => (b.boughtAt || '').localeCompare(a.boughtAt || ''))
+    : sortWants(shown, sort, paid);
+  // Drag handles only make sense in your own order, on the full open list (not while searching).
+  const draggable = sort === 'custom' && ui.wantFilter !== 'Bought' && !q;
+  // A category filter already narrows to one category, so grouping by category there means no headers.
+  const effGroup = groupMode === 'category' && !['All', 'Bought'].includes(ui.wantFilter) ? 'none' : groupMode;
 
   const row = (w, showBrand) => {
     const st = statsForName(w.name);
@@ -590,10 +601,11 @@ function renderWishlist() {
         </div>
         ${w.targetPrice != null ? `<span class="pill">${formatMoney(w.targetPrice)}</span>` : ''}
         ${w.url ? `<a class="link-btn" href="${esc(w.url)}" target="_blank" rel="noopener" aria-label="Open ${esc(safeHost(w.url))}">${ICON.link}</a>` : ''}
+        ${draggable ? `<span class="drag-handle" data-drag aria-label="Drag to reorder ${esc(w.name)}" role="button">${ICON.grip}</span>` : ''}
       </div>`,
       w.status === 'bought'
         ? [{ act: 'wreopen', label: 'Want again', cls: 'gray' }, { act: 'wdelete', label: 'Delete', cls: 'red' }]
-        : [{ act: 'wbought', label: 'Bought', cls: 'green' }, { act: 'wdelete', label: 'Delete', cls: 'red' }],
+        : [...(sort === 'custom' ? [{ act: 'wtop', label: 'Top', cls: 'gray' }] : []), { act: 'wbought', label: 'Bought', cls: 'green' }, { act: 'wdelete', label: 'Delete', cls: 'red' }],
       `data-wid="${w.id}"`
     );
   };
@@ -601,20 +613,22 @@ function renderWishlist() {
   let listHtml;
   if (!S.wants.length) {
     listHtml = `<div class="empty">Nothing on your wishlist yet.<br><button class="btn ghost" data-notes-import="wants">Paste a list from Notes</button></div>`;
-  } else if (!shown.length) {
+  } else if (!sorted.length) {
     listHtml = `<p class="empty small">${q ? 'No matches.' : 'Nothing here.'}</p>`;
-  } else if (ui.wantFilter === 'All') {
-    listHtml = groupBy([...shown].sort((a, b) => allCats.indexOf(a.category || 'Other') - allCats.indexOf(b.category || 'Other')), (w) => w.category || 'Other')
-      .map(([c, xs]) => `<section class="group"><h3>${esc(c)}</h3><ul class="list">${xs.sort(sortFn).map((w) => row(w, true)).join('')}</ul></section>`).join('');
-  } else if (ui.wantFilter === 'Bought') {
-    listHtml = `<ul class="list mt">${[...shown].sort((a, b) => (b.boughtAt || '').localeCompare(a.boughtAt || '')).map((w) => row(w, true)).join('')}</ul>`;
+  } else if (effGroup === 'none') {
+    listHtml = `<ul class="list mt" data-sortable>${sorted.map((w) => row(w, true)).join('')}</ul>`;
   } else {
-    listHtml = groupBy([...shown].sort((a, b) => (a.brand || '~').localeCompare(b.brand || '~')), (w) => w.brand || 'No brand')
-      .map(([brand, xs]) => `<section class="group"><h3>${esc(brand)}</h3><ul class="list">${xs.sort(sortFn).map((w) => row(w, false)).join('')}</ul></section>`).join('');
+    const key = effGroup === 'brand' ? (w) => w.brand || 'No brand' : (w) => w.category || 'Other';
+    const groups = groupBy(sorted, key); // keeps the sorted order inside each group
+    if (effGroup === 'brand') groups.sort((a, b) => (a[0] === 'No brand') - (b[0] === 'No brand') || a[0].localeCompare(b[0]));
+    else groups.sort((a, b) => allCats.indexOf(a[0]) - allCats.indexOf(b[0]));
+    listHtml = groups.map(([g, xs]) => `<section class="group"><h3>${esc(g)}</h3><ul class="list" data-sortable>${xs.map((w) => row(w, effGroup !== 'brand')).join('')}</ul></section>`).join('');
   }
+  const sortLabel = SORTS.find((x) => x.id === sort)?.label || 'Sort';
 
   return `
-    ${S.wants.length ? `<input id="want-search" type="search" placeholder="Search wishlist" value="${esc(q)}">
+    ${S.wants.length ? `<div class="tab-head"><input id="want-search" type="search" placeholder="Search wishlist" value="${esc(q)}">
+      <button class="btn icon-text sort-btn" data-sort-menu aria-label="Sort and group: ${esc(sortLabel)}">${ICON.sort}<span>${esc(sortLabel)}</span></button></div>
     <div class="chips scroll" role="tablist">
       ${['All', ...cats].map((c) => `<button class="chip ${ui.wantFilter === c ? 'on' : ''}" data-want-filter="${esc(c)}">${esc(c)} <span class="n">${c === 'All' ? open.length : counts[c]}</span></button>`).join('')}
       ${bought.length ? `<button class="chip ${ui.wantFilter === 'Bought' ? 'on' : ''}" data-want-filter="Bought">Bought <span class="n">${bought.length}</span></button>` : ''}
@@ -884,6 +898,10 @@ function openWant(w) {
     $('[data-save]', d).onclick = async () => {
       const x = read();
       if (!x.name) return toast('Give it a name');
+      if (!Number.isFinite(x.rank)) {
+        const ranks = S.wants.filter((o) => Number.isFinite(o.rank)).map((o) => o.rank);
+        if (ranks.length) x.rank = Math.max(...ranks) + 1024;
+      }
       await write([{ store: 'wants', put: x }]);
       d.close();
       await reload();
@@ -894,6 +912,104 @@ function openWant(w) {
     if (bought) bought.onclick = () => buyWant(read());
   });
 }
+function openSortMenu() {
+  const sort = store('wantSort') || 'custom', group = store('wantGroup') || 'category';
+  const body = `
+    <h3>Sort by</h3>
+    <div class="group-box radio-list">${SORTS.map((x) => `<label class="radio-row"><input type="radio" name="sort" value="${x.id}" ${x.id === sort ? 'checked' : ''}><span>${esc(x.label)}</span>${x.id === 'custom' ? '<span class="sub">drag ≡ to arrange</span>' : ''}</label>`).join('')}</div>
+    <h3>Group by</h3>
+    <div class="seg-toggle full" role="radiogroup">${GROUPS.map((x) => `<label><input type="radio" name="group" value="${x.id}" ${x.id === group ? 'checked' : ''}><span>${esc(x.label)}</span></label>`).join('')}</div>
+    <p class="sub">Price uses your target price, then the price on the store’s site, then what you paid. Items without a price go last.</p>`;
+  openSheet('Sort wishlist', body, (d) => {
+    d.addEventListener('change', (e) => {
+      if (e.target.name === 'sort') store('wantSort', e.target.value);
+      if (e.target.name === 'group') store('wantGroup', e.target.value);
+      render();
+      if (e.target.name === 'sort') setTimeout(() => d.close(), 150);
+    });
+  });
+}
+
+// Make sure every open wish has an explicit rank before you start arranging.
+async function ensureRanks() {
+  const open = S.wants.filter((w) => w.status !== 'bought');
+  if (open.every((w) => Number.isFinite(w.rank))) return;
+  const changed = normalizeRanks(open);
+  if (changed.length) {
+    await write(changed.map((w) => ({ store: 'wants', put: w })));
+    for (const c of changed) Object.assign(S.wants.find((w) => w.id === c.id), { rank: c.rank });
+  }
+}
+async function moveWantToTop(w) {
+  await ensureRanks();
+  const ranks = S.wants.filter((x) => x.status !== 'bought' && x.id !== w.id).map((x) => x.rank);
+  const rank = (ranks.length ? Math.min(...ranks) : 0) - 1024;
+  await write([{ store: 'wants', put: { ...S.wants.find((x) => x.id === w.id), rank } }]);
+  haptic();
+  await reload();
+  toast(`Moved ${w.name} to the top`);
+}
+
+// Drag to reorder (pointer events: works with touch and mouse). Only within one list section.
+function enableDrag(root) {
+  let st = null;
+  const rowsOf = (ul) => [...ul.children].filter((li) => li.matches('li.swipe'));
+  root.addEventListener('pointerdown', async (e) => {
+    const handle = e.target.closest('[data-drag]');
+    if (!handle) return;
+    e.preventDefault();
+    const li = handle.closest('li.swipe'), ul = li.parentElement;
+    const rows = rowsOf(ul);
+    const from = rows.indexOf(li);
+    const h = li.getBoundingClientRect().height;
+    st = { li, ul, rows, from, to: from, h, startY: e.clientY, pointerId: e.pointerId, scrollStart: scrollY };
+    handle.setPointerCapture(e.pointerId);
+    li.classList.add('dragging');
+    ul.classList.add('drag-active');
+    haptic();
+  });
+  root.addEventListener('pointermove', (e) => {
+    if (!st || e.pointerId !== st.pointerId) return;
+    e.preventDefault();
+    // Auto-scroll near the top/bottom edges.
+    if (e.clientY < 90) scrollBy(0, -8);
+    else if (e.clientY > innerHeight - 140) scrollBy(0, 8);
+    const dy = e.clientY - st.startY + (scrollY - st.scrollStart);
+    st.li.style.transform = `translateY(${dy}px)`;
+    const to = Math.max(0, Math.min(st.rows.length - 1, st.from + Math.round(dy / st.h)));
+    if (to !== st.to) {
+      st.to = to;
+      haptic();
+      st.rows.forEach((r, i) => {
+        if (r === st.li) return;
+        let shift = 0;
+        if (st.from < to && i > st.from && i <= to) shift = -st.h;
+        if (st.from > to && i < st.from && i >= to) shift = st.h;
+        r.style.transform = shift ? `translateY(${shift}px)` : '';
+      });
+    }
+  });
+  const end = async (e) => {
+    if (!st || e.pointerId !== st.pointerId) return;
+    const { li, ul, rows, from, to } = st;
+    st = null;
+    rows.forEach((r) => (r.style.transform = ''));
+    li.classList.remove('dragging');
+    ul.classList.remove('drag-active');
+    if (to === from) return;
+    await ensureRanks();
+    const order = rows.filter((r) => r !== li);
+    order.splice(to, 0, li);
+    const get = (r) => r && S.wants.find((w) => w.id === r.dataset.wid);
+    const moved = get(li);
+    const rank = rankBetween(get(order[to - 1]), get(order[to + 1]));
+    await write([{ store: 'wants', put: { ...moved, rank } }]);
+    await reload();
+  };
+  root.addEventListener('pointerup', end);
+  root.addEventListener('pointercancel', end);
+}
+
 async function deleteWant(w) {
   await write([{ store: 'wants', del: w.id }]);
   await reload();
@@ -1482,6 +1598,7 @@ function wire() {
 
   const main = $('#main');
   enableSwipe(main);
+  enableDrag(main);
   main.addEventListener('input', (e) => {
     if (e.target.id === 'price-search' || e.target.id === 'want-search') render();
   });
@@ -1515,6 +1632,7 @@ function wire() {
       }
       if (li.dataset.wid) {
         const w = S.wants.find((x) => x.id === li.dataset.wid);
+        if (a === 'wtop') return moveWantToTop(w);
         if (a === 'wbought') return markWantBought(w);
         if (a === 'wdelete') return deleteWant(w);
         if (a === 'wreopen') { await write([{ store: 'wants', put: { ...w, status: 'open', boughtAt: null } }]); return reload(); }
@@ -1568,6 +1686,8 @@ function wire() {
       });
     if (t('[data-store-filter]')) return (ui.storeFilter = t('[data-store-filter]').dataset.storeFilter), render();
     if (t('[data-finish]')) return openFinish();
+    if (t('[data-drag]')) return;
+    if (t('[data-sort-menu]')) return openSortMenu();
     if (t('[data-want-filter]')) return (ui.wantFilter = t('[data-want-filter]').dataset.wantFilter), render();
     if (t('[data-want]')) return openWant(S.wants.find((w) => w.id === t('[data-want]').dataset.want));
     if (t('[data-prices-view]')) return (ui.pricesView = t('[data-prices-view]').dataset.pricesView), render();
