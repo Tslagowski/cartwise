@@ -629,7 +629,7 @@ async function linkPreview(url) {
   const reset = Number(res.headers.get('x-rate-limit-reset'));
   if (json.code === 'ERATE' || res.status === 429) {
     const when = reset ? new Date(reset * 1000).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : 'tomorrow';
-    const err = new Error(`Free photo lookups are used up until ${when}. Copy the photo on the site, then hold the paste button.`);
+    const err = new Error(`Free photo lookups are used up until ${when}. Copy the photo on the site, then tap the paste button twice.`);
     err.rate = true;
     throw err;
   }
@@ -687,7 +687,7 @@ function openWant(w) {
       <label>Link<input name="url" type="url" value="${esc(w.url)}" placeholder="https://"></label>
       <div class="photo-actions">
         <button type="button" class="btn" data-fetch>Get photo from link</button>
-        <div class="paste-zone" contenteditable="true" inputmode="none" enterkeyhint="done" role="textbox" aria-label="Hold to paste a copied photo" data-paste-zone></div>
+        <div class="paste-zone" contenteditable="true" inputmode="none" enterkeyhint="done" role="textbox" aria-label="Tap twice to paste a copied photo" data-paste-zone></div>
       </div>
       <label>Notes<textarea name="notes" rows="2" placeholder="e.g. wait for $40 deals">${esc(w.notes)}</textarea></label>
     </div>
