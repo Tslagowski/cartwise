@@ -496,3 +496,7 @@ html[data-text="large"] body { zoom: 1.12; }
 .drag-active li.swipe.dragging { transition: none; z-index: 5; position: relative; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3); }
 li.swipe.dragging .swipe-content { background: var(--card-2); }
 .drag-active li + li::before { display: none; }
+
+/* v0.7.1: highlight a row after saving */
+@keyframes flash { 0%, 40% { background: color-mix(in srgb, var(--accent) 28%, var(--card)); } 100% { background: var(--card); } }
+li.flash .swipe-content, .chip.flash { animation: flash 1.6s ease-out; }

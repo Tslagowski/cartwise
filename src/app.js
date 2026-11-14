@@ -118,6 +118,21 @@ function datesFor(g, idx) {
 }
 const ago = (n) => (n <= 0 ? 'today' : n === 1 ? 'yesterday' : `${n} days ago`);
 
+// After saving, bring the item into view (centered) and flash it so you don't lose your place.
+function revealRow(selector) {
+  const el = $(selector);
+  if (!el) return false;
+  // Wait a frame so the sheet has closed and layout has settled.
+  requestAnimationFrame(() => {
+    el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    el.classList.remove('flash');
+    void el.offsetWidth; // restart the animation
+    el.classList.add('flash');
+    setTimeout(() => el.classList.remove('flash'), 1600);
+  });
+  return true;
+}
+
 // Keep an element at the same spot on screen across a re-render (no jumping while you tap).
 async function keepInPlace(selector, fn) {
   const before = $(selector)?.getBoundingClientRect().top;
@@ -517,6 +532,13 @@ function openGrocery(g) {
       await write([{ store: 'groceries', put: { ...g, name, brand: $('[name=brand]', d).value.trim(), qty: $('[name=qty]', d).value.trim(), details: $('[name=details]', d).value.trim(), store: $('[name=store]:checked', d)?.value || '', aisle: $('[name=aisle]:checked', d)?.value || 'Other' } }]);
       d.close();
       await reload();
+      if (!$(`[data-gid="${g.id}"]`) && ui.storeFilter) { ui.storeFilter = ''; render(); }
+      // Usuals live in a collapsed section; open it if that's where the item is.
+      if (!revealRow(`[data-gid="${g.id}"]`) && S.groceries.find((x) => x.id === g.id)?.status === 'stocked') {
+        ui.usualsOpen = true;
+        render();
+        revealRow(`[data-usual="${g.id}"]`);
+      }
     };
     const del = $('[data-delete]', d);
     if (del)
@@ -905,6 +927,14 @@ function openWant(w) {
       await write([{ store: 'wants', put: x }]);
       d.close();
       await reload();
+      // If the current filter or search hides it (e.g. saved into another category), show All.
+      if (!$(`[data-wid="${x.id}"]`)) {
+        ui.wantFilter = x.status === 'bought' ? 'Bought' : 'All';
+        const sEl = $('#want-search');
+        if (sEl) sEl.value = '';
+        render();
+      }
+      revealRow(`[data-wid="${x.id}"]`);
     };
     const del = $('[data-delete]', d);
     if (del) del.onclick = async () => { d.close(); await deleteWant(w); };

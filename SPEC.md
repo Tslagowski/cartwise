@@ -110,6 +110,7 @@ Organized like dedicated list apps (AnyList, Reminders, Bring!), not like the No
   - **My sizes:** sizes saved per brand (`settings` store, id `brandSizes`). In the wish sheet, picking a brand shows your saved sizes plus sizes used on other wishes from that brand; tap to use, "+ Save … as my size" to keep one; a single saved size fills in automatically. Settings → My sizes lists, adds and removes them.
   - IndexedDB v2 adds the `settings` store; backups include it, older backups still import.
 - **v0.7.0 — wishlist sorting:** a sort button beside search opens Sort by (My order, Priority, Price low→high / high→low, Newest, Oldest, Brand A–Z, Name A–Z) and Group by (Category, Brand, None); both are remembered per device. Price = target price, else store price, else last paid; unpriced items go last. In My order, rows get a ≡ handle (pointer events, works with touch and mouse) to drag within a section, and swipe → Top moves a wish to the top. Order is stored as `wants.rank` (spaced by 1024, new wishes go to the bottom, existing wishes get ranks the first time you arrange).
+- **v0.7.1:** after saving a wish or grocery item, its row scrolls to the center of the screen and flashes. If the current filter, search or store chip would hide it, the view switches to All; grocery usuals open if that's where it is.
 - **Migration:** on load, old records are upgraded (`groceries.status` need|cart|stocked + `aisle`; `wants.brand` + `category` from the old heading, with heading notes like "(wait for $40 deals)" moved into notes).
 
 ## 7. Acceptance criteria
