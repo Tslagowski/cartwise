@@ -66,7 +66,8 @@ Just me, on an iPhone 14 Pro Max, in Safari or from the home screen.
   - `trips` {id, storeId, date, note, createdAt}
   - `lines` {id, tripId, productId, price, qty, size, unit, onSale}
   - `wants` {id, name, brand, category, details, priority: Low|Medium|High, targetPrice?, url?, notes, image (data URL or https URL), sitePrice?, sitePriceAt?, status: open|bought, createdAt, boughtAt?, v}
-  - `groceries` {id, name, brand, qty, details, aisle, store, status: need|cart|stocked, lastBought?, createdAt, v}
+  - `settings` {id, value} — `brandSizes`: { [brand lowercase]: { brand, sizes: [string] } }
+  - `groceries` {id, name, brand, qty, details, boughtDates?, snoozeUntil?, aisle, store, status: need|cart|stocked, lastBought?, createdAt, v}
 - **External services:** Microlink (`api.microlink.io`, free tier, no key; as of 2026-11 the free plan allows only 5 lookups/day, reported in `x-rate-limit-*` headers) only when "From link" is tapped on a wishlist item. Nothing else leaves the phone.
 - **Vendored libraries:** `vendor/zxing.min.js` (@zxing/library 0.21.3, lazy-loaded for barcode scanning on iPhone, where Safari has no BarcodeDetector).
 - **Tests:** pure logic (unit conversion, stats, export/import shape) in `src/lib/`, tested with `node --test`, offline.
@@ -104,6 +105,10 @@ Organized like dedicated list apps (AnyList, Reminders, Bring!), not like the No
 - **v0.4.9:** "Get photo from link" tries Shopify first: `/products/<handle>.json` (CORS open on Shopify stores) gives photo (variant-aware), title, vendor, variant and current price with no lookup service and no limit; Microlink is the fallback for other sites. The site price is saved on the wish (`sitePrice`, `sitePriceAt`) and shown on its row. The photo picker accepts WebP/AVIF/HEIC explicitly, since images saved from shops may be hidden by a plain image/* filter.
 - **v0.5.0:** one-step photo paste: "Hold to paste photo" is itself the paste target (long-press → Paste). The clipboard-API "Paste photo" button is gone — on iPhone it needed an extra permission tap and didn't return copied images.
 - **v0.5.1:** paste button reads "Tap to paste photo", then "Tap again, then Paste" once selected (iPhone only shows its Paste menu on a second tap or a long-press).
+- **v0.6.0 — habits:**
+  - **Running low:** a card at the top of Groceries suggests usuals that are due, based on the median gap between purchase dates (logged trips with the same name/brand, plus days you finished shopping with the item in the cart; `groceries.boughtDates`, last 12). Needs 2+ dates. Add, Add all, or swipe → Not now (snoozes for half the usual gap, min 2 days; `snoozeUntil`).
+  - **My sizes:** sizes saved per brand (`settings` store, id `brandSizes`). In the wish sheet, picking a brand shows your saved sizes plus sizes used on other wishes from that brand; tap to use, "+ Save … as my size" to keep one; a single saved size fills in automatically. Settings → My sizes lists, adds and removes them.
+  - IndexedDB v2 adds the `settings` store; backups include it, older backups still import.
 - **Migration:** on load, old records are upgraded (`groceries.status` need|cart|stocked + `aisle`; `wants.brand` + `category` from the old heading, with heading notes like "(wait for $40 deals)" moved into notes).
 
 ## 7. Acceptance criteria

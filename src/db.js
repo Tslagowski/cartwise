@@ -2,7 +2,7 @@
 import { STORES } from './lib/backup.js';
 
 const DB_NAME = 'cartwise';
-const DB_VERSION = 1;
+const DB_VERSION = 2; // v2 adds the 'settings' store (my sizes)
 let dbPromise;
 
 function open() {

@@ -7,9 +7,11 @@ import { sparkPath, sparkEnd } from './lib/spark.js';
 import { AISLES, WANT_CATEGORIES, aisleFor, classifyWant } from './lib/categorize.js';
 import { migrateAll, SCHEMA, splitItemName } from './lib/migrate.js';
 import { scanBarcode } from './scanner.js';
+import { runningLow, addBoughtDate } from './lib/restock.js';
+import { addSize, removeSize, sizeSuggestions } from './lib/sizes.js';
 
 // ---------- state ----------
-let S = { stores: [], products: [], trips: [], lines: [], wants: [], groceries: [] };
+let S = { stores: [], products: [], trips: [], lines: [], wants: [], groceries: [], settings: [] };
 let tab = 'groceries';
 const ui = {
   storeFilter: '',         // groceries: '' = all stores
@@ -86,6 +88,35 @@ function groceryStats(g) {
   return productStats(historyFor((same.length ? same : ps).map((p) => p.id)));
 }
 const variantLabel = (g) => [g.brand, g.details].filter(Boolean).join(' · ');
+// ---------- settings (my sizes) ----------
+const getSetting = (id, fallback) => S.settings.find((x) => x.id === id)?.value ?? fallback;
+async function putSetting(id, value) {
+  await write([{ store: 'settings', put: { id, value } }]);
+  const i = S.settings.findIndex((x) => x.id === id);
+  if (i >= 0) S.settings[i] = { id, value };
+  else S.settings.push({ id, value });
+}
+const brandSizes = () => getSetting('brandSizes', {});
+
+// ---------- running low ----------
+// Purchase dates for a grocery item: logged trips with the same name (and brand, if set),
+// plus the days you finished shopping with it in the cart.
+function purchaseDatesIndex() {
+  const trips = byId(S.trips), prods = byId(S.products);
+  const idx = {};
+  for (const l of S.lines) {
+    const p = prods[l.productId], t = trips[l.tripId];
+    if (!p || !t) continue;
+    (idx[lc(p.name)] ||= []).push({ date: t.date, brand: lc(p.brand) });
+  }
+  return idx;
+}
+function datesFor(g, idx) {
+  const fromTrips = (idx[lc(g.name)] || []).filter((x) => !g.brand || !x.brand || x.brand === lc(g.brand)).map((x) => x.date);
+  return [...fromTrips, ...(g.boughtDates || []), g.lastBought].filter(Boolean);
+}
+const ago = (n) => (n <= 0 ? 'today' : n === 1 ? 'yesterday' : `${n} days ago`);
+
 // Keep an element at the same spot on screen across a re-render (no jumping while you tap).
 async function keepInPlace(selector, fn) {
   const before = $(selector)?.getBoundingClientRect().top;
@@ -139,18 +170,29 @@ const ICON = {
 const sheet = () => $('#sheet');
 function openSheet(title, body, wire, { full = false } = {}) {
   const d = sheet();
+  // The toast may be parked inside this dialog; move it out before replacing the dialog's contents.
+  const tEl = $('#toast');
+  if (tEl && d.contains(tEl)) document.body.append(tEl);
   d.classList.toggle('full', full);
   d.innerHTML = `<form method="dialog" class="sheet-inner">
     <div class="grabber"></div>
     <header class="sheet-head"><h2>${esc(title)}</h2><button type="button" class="icon-btn" data-close aria-label="Close">✕</button></header>
     <div class="sheet-body">${body}</div></form>`;
   $('[data-close]', d).onclick = () => d.close();
+  d.onclose = () => { const t = $('#toast'); if (t && d.contains(t)) document.body.append(t); };
   d.querySelector('form').onsubmit = (e) => e.preventDefault();
   if (!d.open) d.showModal();
   wire?.(d);
 }
 function toast(msg, action) {
-  const t = $('#toast');
+  let t = $('#toast');
+  if (!t) {
+    t = document.createElement('div');
+    t.id = 'toast';
+    t.className = 'toast';
+    t.setAttribute('role', 'status');
+    document.body.append(t);
+  }
   // An open <dialog> sits in the browser's top layer, above everything in <body>,
   // so show the toast inside whichever dialog is open or it would be hidden.
   const host = $('#scanner').open ? $('#scanner') : sheet().open ? sheet() : document.body;
@@ -318,6 +360,18 @@ function renderGroceries() {
   const cart = items.filter((g) => g.status === 'cart');
   const usuals = items.filter((g) => g.status === 'stocked');
   const stores = groceryStores();
+  const idx = purchaseDatesIndex();
+  const low = runningLow(usuals, (g) => datesFor(g, idx), today());
+  const lowHtml = low.length ? `<section class="group low"><h3>Running low · ${low.length}${low.length > 1 ? '<button class="h3-action" data-low-all>Add all</button>' : ''}</h3><ul class="list">${low
+    .map(({ item: g, every, daysSince }) => swipeRow(
+      `<div class="cell">
+        <div class="grow tap" data-low-add="${g.id}"><div class="title">${esc(g.name)}</div>
+          <div class="sub">${[variantLabel(g) && esc(variantLabel(g)), `usually every ${every} days`, `last ${ago(daysSince)}`].filter(Boolean).join(' · ')}</div></div>
+        <button type="button" class="btn sm-add" data-low-add="${g.id}" aria-label="Add ${esc(g.name)} to your list">Add</button>
+      </div>`,
+      [{ act: 'snooze', label: 'Not now', cls: 'gray' }],
+      `data-gid="${g.id}" data-every="${every}"`
+    )).join('')}</ul></section>` : '';
 
   const row = (g) => {
     const st = groceryStats(g);
@@ -342,9 +396,10 @@ function renderGroceries() {
       <input name="q" placeholder="Add an item" enterkeyhint="done" aria-label="Add an item">
       <div class="suggest" hidden></div>
     </form>
+    ${lowHtml}
     ${need.length
       ? byAisle(need).map(([a, xs]) => `<section class="group"><h3>${esc(a)}</h3><ul class="list">${xs.map(row).join('')}</ul></section>`).join('')
-      : `<div class="empty">${S.groceries.length ? '<b>All set.</b><br>Nothing on your list. Add items above or tap your usuals below.' : 'Your grocery list is empty.<br><button class="btn ghost" data-notes-import="groceries">Paste a list from Notes</button>'}</div>`}
+      : `<div class="empty">${S.groceries.length ? (low.length ? 'Nothing on your list yet. Add what’s running low above, or tap your usuals below.' : '<b>All set.</b><br>Nothing on your list. Add items above or tap your usuals below.') : 'Your grocery list is empty.<br><button class="btn ghost" data-notes-import="groceries">Paste a list from Notes</button>'}</div>`}
     ${cart.length ? `<section class="group"><h3>In cart · ${cart.length}</h3><ul class="list">${cart.map(row).join('')}</ul></section>` : ''}
     ${usuals.length ? `<details class="usuals" ${(ui.usualsOpen ?? !need.length) ? 'open' : ''}><summary>Your usuals · ${usuals.length}</summary>
       <p class="sub hint-line">Tap to add back to your list.</p>
@@ -481,7 +536,7 @@ function openFinish() {
     </div>`;
   openSheet('Finish shopping', body, (d) => {
     const done = async (storeName) =>
-      write(cart.map((g) => ({ store: 'groceries', put: { ...g, status: 'stocked', store: g.store || storeName || '', lastBought: today() } })));
+      write(cart.map((g) => ({ store: 'groceries', put: { ...g, status: 'stocked', store: g.store || storeName || '', lastBought: today(), boughtDates: addBoughtDate(g.boughtDates || (g.lastBought ? [g.lastBought] : []), today()), snoozeUntil: '' } })));
     $('[data-clear]', d).onclick = async () => {
       await done();
       d.close();
@@ -675,6 +730,7 @@ function openWant(w) {
       </div>
       <label>Brand<input name="brand" list="dl-brands" value="${esc(w.brand)}" placeholder="e.g. Barbour" autocomplete="off"></label>
       <label>Size / fit / color<input name="details" value="${esc(w.details)}" placeholder="e.g. L, 33x34 athletic, black"></label>
+      <div class="size-chips" data-size-chips></div>
     </div>
     <h3>Category</h3>
     <div class="chips wrap" role="radiogroup">${wantCategories().map((c) => `<label class="chip"><input type="radio" name="category" value="${esc(c)}" ${c === (w.category || 'Other') ? 'checked' : ''}>${esc(c)}</label>`).join('')}${newChip('New category', 'category')}</div>
@@ -698,6 +754,42 @@ function openWant(w) {
       <button type="button" class="btn primary" data-save>Save</button>
     </div>`;
   openSheet(isNew ? 'New wish' : 'Edit wish', body, (d) => {
+    // My sizes: show saved sizes (and sizes used on other wishes) for the brand; tap to use, + to save.
+    const brandEl = $('[name=brand]', d), detailsEl = $('[name=details]', d), chipsEl = $('[data-size-chips]', d);
+    const drawSizes = () => {
+      const brand = brandEl.value.trim();
+      const sugg = sizeSuggestions(brandSizes(), S.wants, brand, w.id);
+      const cur = detailsEl.value.trim();
+      const canSave = brand && cur && !(brandSizes()[lc(brand)]?.sizes || []).some((x) => lc(x) === lc(cur));
+      chipsEl.innerHTML = !brand ? '' : (sugg.length ? `<span class="sub">Your ${esc(brand)} sizes:</span>` : '')
+        + sugg.map((x) => `<button type="button" class="chip ${x.saved ? 'saved' : ''}" data-use-size="${esc(x.size)}">${esc(x.size)}</button>`).join('')
+        + (canSave ? `<button type="button" class="chip add-chip" data-save-size>+ Save “${esc(cur)}” as my ${esc(brand)} size</button>` : '');
+      chipsEl.hidden = !chipsEl.innerHTML;
+    };
+    brandEl.addEventListener('input', drawSizes);
+    brandEl.addEventListener('change', () => {
+      drawSizes();
+      // Fill the size automatically when there's exactly one saved size for this brand.
+      const saved = brandSizes()[lc(brandEl.value)]?.sizes || [];
+      if (!detailsEl.value.trim() && saved.length === 1) { detailsEl.value = saved[0]; drawSizes(); toast(`Filled your ${brandEl.value.trim()} size`); }
+    });
+    detailsEl.addEventListener('input', drawSizes);
+    chipsEl.addEventListener('click', async (e) => {
+      const use = e.target.closest('[data-use-size]');
+      if (use) {
+        const v = use.dataset.useSize, cur = detailsEl.value.trim();
+        detailsEl.value = !cur ? v : lc(cur).includes(lc(v)) ? cur : `${cur}, ${v}`;
+        haptic();
+        return drawSizes();
+      }
+      if (e.target.closest('[data-save-size]')) {
+        await putSetting('brandSizes', addSize(brandSizes(), brandEl.value, detailsEl.value));
+        haptic();
+        toast(`Saved your ${brandEl.value.trim()} size`);
+        drawSizes();
+      }
+    });
+    drawSizes();
     $('[data-newchip=category]', d).onclick = (e) =>
       openNewChip(e.currentTarget, 'Category name', (v, input) => addRadioChip(input, 'category', v.replace(/^./, (c) => c.toUpperCase())));
     const setImage = (src) => {
@@ -1200,6 +1292,13 @@ async function exportData() {
     if (e.name !== 'AbortError') toast('Export failed: ' + e.message);
   }
 }
+function sizesListHtml() {
+  const entries = Object.values(brandSizes()).sort((a, b) => a.brand.localeCompare(b.brand));
+  return `<div class="sizes-list">${entries.length ? entries.map((e) => `<div class="size-row"><b>${esc(e.brand)}</b><div class="chips wrap">${e.sizes
+    .map((s) => `<span class="chip saved">${esc(s)}<button type="button" class="chip-x" data-rm-size="${esc(s)}" data-brand="${esc(e.brand)}" aria-label="Remove ${esc(s)}">×</button></span>`).join('')}</div></div>`).join('')
+    : '<p class="sub">Save your size for a brand and it fills in when you add a wish from that brand.</p>'}</div>`;
+}
+
 async function openSettings() {
   let persisted = null;
   try { persisted = await navigator.storage?.persisted?.(); } catch {}
@@ -1213,6 +1312,11 @@ async function openSettings() {
     </div>
     <h3>Bring in a list</h3>
     <div class="group-box form"><button type="button" class="btn" data-notes>Paste from Notes</button></div>
+    <h3>My sizes</h3>
+    <div class="group-box form" data-sizes-box>${sizesListHtml()}
+      <div class="grid2"><input name="sizeBrand" list="dl-brands" placeholder="Brand" autocomplete="off"><input name="sizeValue" placeholder="Size, e.g. L or 33x34"></div>
+      <button type="button" class="btn" data-add-size>Add size</button>
+    </div>
     <h3>Text size</h3>
     <div class="group-box form">
       <div class="seg-toggle full" role="radiogroup" aria-label="Text size">${[['small', 'Smaller'], ['default', 'Default'], ['large', 'Larger']]
@@ -1228,6 +1332,22 @@ async function openSettings() {
     <p class="sub version">Cartwise v${window.CARTWISE_VERSION || ''} · ${S.trips.length} trips · ${S.products.length} items priced</p>`;
   openSheet('Settings', body, (d) => {
     $('[data-export]', d).onclick = exportData;
+    const box = $('[data-sizes-box]', d);
+    box.addEventListener('click', async (e) => {
+      const rm = e.target.closest('[data-rm-size]');
+      if (rm) {
+        await putSetting('brandSizes', removeSize(brandSizes(), rm.dataset.brand, rm.dataset.rmSize));
+        $('.sizes-list', d).outerHTML = sizesListHtml();
+        return;
+      }
+      if (e.target.closest('[data-add-size]')) {
+        const b = $('[name=sizeBrand]', d).value.trim(), v = $('[name=sizeValue]', d).value.trim();
+        if (!b || !v) return toast('Enter a brand and a size');
+        await putSetting('brandSizes', addSize(brandSizes(), b, v));
+        $('[name=sizeValue]', d).value = '';
+        $('.sizes-list', d).outerHTML = sizesListHtml();
+      }
+    });
     $$('[name=textSize]', d).forEach((r) => r.addEventListener('change', () => {
       store('textSize', r.value);
       document.documentElement.dataset.text = r.value;
@@ -1386,6 +1506,11 @@ function wire() {
       if (li.dataset.gid) {
         const g = S.groceries.find((x) => x.id === li.dataset.gid);
         if (a === 'gedit') return openGrocery(g);
+        if (a === 'snooze') {
+          const days = Math.max(2, Math.round(Number(li.dataset.every || 4) / 2));
+          const until = new Date(Date.now() + days * 864e5).toISOString().slice(0, 10);
+          return setGrocery(g, { snoozeUntil: until }, `Hiding ${g.name} for ${days} days`);
+        }
         if (a === 'gremove') return setGrocery(g, { status: 'stocked' }, `Removed ${g.name}`);
       }
       if (li.dataset.wid) {
@@ -1408,6 +1533,19 @@ function wire() {
       const g = S.groceries.find((x) => x.id === t('[data-gtoggle]').dataset.gtoggle);
       haptic();
       return setGrocery(g, { status: g.status === 'cart' ? 'need' : 'cart' });
+    }
+    if (t('[data-low-add]')) {
+      const g = S.groceries.find((x) => x.id === t('[data-low-add]').dataset.lowAdd);
+      haptic();
+      await keepInPlace('[data-quick-add]', async () => { await write([{ store: 'groceries', put: { ...g, status: 'need', snoozeUntil: '' } }]); await reload(); });
+      return toast(`Added ${g.name}`);
+    }
+    if (t('[data-low-all]')) {
+      const ids = [...document.querySelectorAll('.low [data-gid]')].map((li) => li.dataset.gid);
+      await write(S.groceries.filter((g) => ids.includes(g.id)).map((g) => ({ store: 'groceries', put: { ...g, status: 'need', snoozeUntil: '' } })));
+      haptic();
+      await reload();
+      return toast(`Added ${ids.length} items`);
     }
     if (t('[data-gopen]')) return openGrocery(S.groceries.find((x) => x.id === t('[data-gopen]').dataset.gopen));
     if (t('[data-usual]')) {

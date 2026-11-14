@@ -61,7 +61,7 @@ test('stats never mix unit families', () => {
 });
 
 test('export then import round-trips', () => {
-  const data = { stores: [{ id: '1', name: 'Walmart' }], products: [], trips: [], lines: [], wants: [{ id: 'w', name: 'Blender' }], groceries: [] };
+  const data = { stores: [{ id: '1', name: 'Walmart' }], products: [], trips: [], lines: [], wants: [{ id: 'w', name: 'Blender' }], groceries: [], settings: [{ id: 'brandSizes', value: {} }] };
   const back = parseImport(JSON.stringify(makeExport(data)));
   assert.deepEqual(back, data);
 });
@@ -120,4 +120,9 @@ test('same-day purchases: the one logged later counts as last', () => {
     { tripId: 'a', price: 5.99, size: 32, unit: 'oz' },
   ];
   assert.equal(priceHistory(lines, trips, {})[0].price, 5.49);
+});
+
+test('older backups without settings still import', () => {
+  const old = { app: 'cartwise', version: 1, data: { stores: [], products: [], trips: [], lines: [], wants: [], groceries: [] } };
+  assert.deepEqual(parseImport(old).settings, []);
 });

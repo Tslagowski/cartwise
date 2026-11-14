@@ -22,6 +22,9 @@ Running log from grill sessions. One row per question answered. Big or hard-to-r
 | 13 | 2026-11-12 | How should the app be organized? | Reinvented around list-app patterns: 3 tabs; groceries by store aisle with usuals + cart; wishlist by category chips with brand as a field | v0.2 copied the Notes structure and felt cluttered; Notes layout is not a requirement | |
 | 14 | 2026-11-13 | Where do grocery specifics go (e.g. which potatoes)? | Per-item Qty and Details fields; "Name (details)" auto-splits | Keeps names short and lists scannable | |
 | 15 | 2026-11-14 | Microlink's free plan is only 5 lookups/day — replace it? | Keep it, show the limit and reset time, and add Paste photo (clipboard) as the unlimited free path | No reliable free no-key alternative; a server would break the $0 / no-backend rule | |
+| 16 | 2026-11-14 | What next after the redesign? | My sizes per brand and running-low suggestions | Chosen by the user | |
+| 17 | 2026-11-14 | Price-drop alerts for wishes? | Not now | Only works for Shopify links; many wish links aren't Shopify | |
+| 18 | 2026-11-14 | Receipt scanning? | Later, maybe | Most grocery trips are pickup; only Walmart/Costco in person, and Costco prices are steady | |
 
 ## Superseded
 Decisions that were later changed. Keep them, so agents don't re-propose them.

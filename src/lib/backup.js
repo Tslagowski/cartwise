@@ -1,4 +1,4 @@
-export const STORES = ['stores', 'products', 'trips', 'lines', 'wants', 'groceries'];
+export const STORES = ['stores', 'products', 'trips', 'lines', 'wants', 'groceries', 'settings'];
 export const EXPORT_VERSION = 1;
 
 export function makeExport(data, now = new Date()) {

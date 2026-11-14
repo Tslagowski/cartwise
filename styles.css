@@ -468,3 +468,16 @@ html[data-text="large"] body { zoom: 1.12; }
 /* v0.5.1: two-tap paste — first tap selects the box, second tap opens iPhone's Paste menu */
 .photo-actions .paste-zone:empty::before { content: "Tap to paste photo"; }
 .photo-actions .paste-zone:focus:empty::before { content: "Tap again, then Paste"; }
+
+/* v0.6.0: running low + my sizes */
+.group.low .list { box-shadow: inset 3px 0 0 var(--high); }
+.h3-action { margin-left: auto; border: 0; background: none; color: var(--accent); font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; padding: 0; }
+.btn.sm-add { min-height: 30px; padding: 0 12px; font-size: 13px; border-radius: 99px; background: var(--accent-soft); color: var(--accent); }
+.size-chips { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: -2px; }
+.size-chips[hidden] { display: none; }
+.size-chips .sub { width: 100%; }
+.chip.saved { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+.sizes-list { display: flex; flex-direction: column; gap: 10px; }
+.size-row { display: flex; flex-direction: column; gap: 4px; }
+.chip-x { border: 0; background: none; color: inherit; font-size: 16px; line-height: 1; padding: 0 0 0 6px; margin-right: -4px; }
+.size-chips .chip:not(.saved):not(.add-chip) { background: var(--card-2); }

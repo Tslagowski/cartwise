@@ -1,5 +1,5 @@
 // Bump VERSION on every deploy so phones pick up the new files.
-const VERSION = 'cartwise-v0.5.1';
+const VERSION = 'cartwise-v0.6.0';
 const SHELL = [
   './',
   './index.html',
@@ -14,6 +14,8 @@ const SHELL = [
   './src/lib/spark.js',
   './src/lib/categorize.js',
   './src/lib/migrate.js',
+  './src/lib/restock.js',
+  './src/lib/sizes.js',
   './src/scanner.js',
   './vendor/zxing.min.js',
   './icons/icon.svg',
