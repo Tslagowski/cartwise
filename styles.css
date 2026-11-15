@@ -517,3 +517,10 @@ li.flash .swipe-content, .chip.flash { animation: flash 1.6s ease-out; }
 .thumb.tap { cursor: zoom-in; }
 .viewer-img { width: 100%; height: auto; }
 .viewer :focus { outline: none; }
+
+/* v0.8.0: fill a wish from a link */
+.link-box input[name="url"] { font-size: 15px; }
+.link-status { display: flex; align-items: center; gap: 8px; margin-top: -2px; line-height: 1.35; }
+.link-status[hidden] { display: none; }
+.spinner { flex: none; width: 14px; height: 14px; border-radius: 50%; border: 2px solid color-mix(in srgb, var(--accent) 30%, transparent); border-top-color: var(--accent); animation: spin .7s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }

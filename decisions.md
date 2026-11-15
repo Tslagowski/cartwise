@@ -26,6 +26,7 @@ Running log from grill sessions. One row per question answered. Big or hard-to-r
 | 17 | 2026-11-14 | Price-drop alerts for wishes? | Not now | Only works for Shopify links; many wish links aren't Shopify | |
 | 18 | 2026-11-14 | Receipt scanning? | Later, maybe | Most grocery trips are pickup; only Walmart/Costco in person, and Costco prices are steady | |
 | 19 | 2026-11-14 | How should the wishlist be ordered? | Default to My order (drag to arrange) with standard sorts and a group-by choice | User wants to rank wishes in the order they want them, plus price/date/brand sorts | |
+| 20 | 2026-11-15 | How should adding a wish get easier? | Paste a product link and the form fills itself (no setup); a free Cloudflare Worker for any store is a possible next step | Shopify gives everything for free; other stores need a server to read product data, so start without one | |
 
 ## Superseded
 Decisions that were later changed. Keep them, so agents don't re-propose them.

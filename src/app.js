@@ -10,6 +10,7 @@ import { scanBarcode } from './scanner.js';
 import { runningLow, addBoughtDate } from './lib/restock.js';
 import { addSize, removeSize, sizeSuggestions } from './lib/sizes.js';
 import { SORTS, GROUPS, sortWants, rankBetween, normalizeRanks } from './lib/wantsort.js';
+import { extractUrl, hostOf, cleanTitle, guessBrand } from './lib/linkfill.js';
 
 // ---------- state ----------
 let S = { stores: [], products: [], trips: [], lines: [], wants: [], groceries: [], settings: [] };
@@ -773,7 +774,7 @@ async function linkPreview(url) {
     throw err;
   }
   if (json.status !== 'success') throw new Error(json.message ? `No photo: ${json.message}` : 'That page didn’t share a photo. Try Paste instead.');
-  return { image: json.data?.image?.url || json.data?.logo?.url || '', title: json.data?.title || '', left: left == null ? null : Number(left) };
+  return { image: json.data?.image?.url || json.data?.logo?.url || '', title: json.data?.title || '', publisher: json.data?.publisher || '', left: left == null ? null : Number(left) };
 }
 
 const IMG_URL = /^https?:\/\/\S+\.(jpe?g|png|webp|gif|avif|heic)(\?\S*)?$/i;
@@ -807,6 +808,14 @@ function openWant(w) {
   let image = w.image || '';
   let sitePrice = null;
   const body = `
+    <div class="group-box form link-box">
+      <label>Product link<input name="url" type="url" inputmode="url" value="${esc(w.url)}" placeholder="Paste a link to fill this in" autocomplete="off"></label>
+      <div class="link-status sub" data-link-status hidden></div>
+      <div class="photo-actions">
+        <button type="button" class="btn" data-fetch>${w.url ? 'Refresh from link' : 'Fill from link'}</button>
+        <div class="paste-zone" contenteditable="true" inputmode="none" enterkeyhint="done" role="textbox" aria-label="Tap twice to paste a copied photo" data-paste-zone></div>
+      </div>
+    </div>
     <div class="group-box form">
       <div class="name-row">
         <button type="button" class="img-box" data-img aria-label="Photo">${image ? `<img src="${esc(image)}" alt="">` : '<span>+ Photo</span>'}</button>
@@ -823,11 +832,6 @@ function openWant(w) {
         <label>Target price<input name="targetPrice" inputmode="decimal" value="${esc(w.targetPrice ?? '')}" placeholder="Optional"></label>
         <div><span class="lbl">Priority</span><div class="seg-toggle full" role="radiogroup">${['Low', 'Medium', 'High']
           .map((p) => `<label><input type="radio" name="priority" value="${p}" ${p === (w.priority || 'Medium') ? 'checked' : ''}><span>${p === 'Medium' ? 'Normal' : p === 'High' ? '★ Must' : 'Low'}</span></label>`).join('')}</div></div>
-      </div>
-      <label>Link<input name="url" type="url" value="${esc(w.url)}" placeholder="https://"></label>
-      <div class="photo-actions">
-        <button type="button" class="btn" data-fetch>Get photo from link</button>
-        <div class="paste-zone" contenteditable="true" inputmode="none" enterkeyhint="done" role="textbox" aria-label="Tap twice to paste a copied photo" data-paste-zone></div>
       </div>
       <label>Notes<textarea name="notes" rows="2" placeholder="e.g. wait for $40 deals">${esc(w.notes)}</textarea></label>
     </div>
@@ -897,48 +901,78 @@ function openWant(w) {
       const url = URL.createObjectURL(f);
       try { setImage(await compressImage(url)); } catch { toast(`Couldn’t read that photo${f.type ? ` (${f.type.replace('image/', '')})` : ''}. Try a screenshot of it instead.`); } finally { URL.revokeObjectURL(url); e.target.value = ''; }
     };
-    $('[data-fetch]', d).onclick = async (e) => {
-      const url = $('[name=url]', d).value.trim();
-      if (!/^https?:\/\//.test(url)) return toast('Paste a link first');
-      const btn = e.currentTarget;
-      btn.disabled = true;
-      btn.textContent = '…';
+    // ---- Fill from link: runs by itself when a link is pasted into a new wish, or on the button.
+    const urlEl = $('[name=url]', d), statusEl = $('[data-link-status]', d), fetchBtn = $('[data-fetch]', d);
+    let categoryTouched = !isNew;
+    $$('[name=category]', d).forEach((r) => r.addEventListener('change', () => (categoryTouched = true)));
+    let lastLooked = '';
+    const status = (html) => { statusEl.hidden = !html; statusEl.innerHTML = html || ''; };
+    const fillFromLink = async ({ auto = false } = {}) => {
+      const url = extractUrl(urlEl.value);
+      if (!url) { if (!auto) toast('Paste a link first'); return; }
+      if (urlEl.value !== url) urlEl.value = url;
+      if (auto && url === lastLooked) return;
+      lastLooked = url;
+      const host = hostOf(url);
+      fetchBtn.disabled = true;
+      status(`<span class="spinner"></span> Looking up ${esc(host)}…`);
+      const filled = [];
+      const set = (n, v) => {
+        const el = $(`[name=${n}]`, d);
+        if (el && !el.value.trim() && v) { el.value = v; filled.push(n === 'details' ? 'size/color' : n); }
+      };
       try {
+        let title = '', brand = '', img = '', publisher = '', price = null, variant = '';
         const shop = await shopifyLookup(url);
-        if (shop?.image) {
-          let img = shop.image;
-          try { img = await compressImage(shop.image); } catch {}
-          setImage(img);
-          const set = (n, v) => { const el = $(`[name=${n}]`, d); if (el && !el.value && v) el.value = v; };
-          set('name', shop.title);
-          set('brand', shop.brand);
-          set('details', shop.variant);
-          if (shop.price != null) { sitePrice = shop.price; toast(`Photo added · ${formatMoney(shop.price)} on the site today`); }
-          return;
+        if (shop) {
+          ({ title, brand, image: img, price, variant } = shop);
+        } else {
+          const pv = await linkPreview(url);
+          ({ title, image: img, publisher } = pv);
+          if (pv.left != null && pv.left <= 2) setTimeout(() => toast(pv.left ? `${pv.left} free lookup${pv.left === 1 ? '' : 's'} left today (Shopify stores don’t count)` : 'That was today’s last free lookup (Shopify stores don’t count)'), 2600);
         }
-        const pv = await linkPreview(url);
-        if (!pv.image) throw new Error('No image on that page');
-        let img = pv.image;
-        try { img = await compressImage(pv.image); } catch {}
-        setImage(img);
-        const name = $('[name=name]', d);
-        if (!name.value && pv.title) name.value = pv.title.split(/[|–-]/)[0].trim();
-        if (pv.left != null && pv.left <= 2) toast(pv.left ? `${pv.left} free photo lookup${pv.left === 1 ? '' : 's'} left today` : 'That was today’s last free photo lookup');
+        brand = guessBrand({ host, vendor: brand, publisher, domainBrands: getSetting('domainBrands', {}), wants: S.wants });
+        const name = cleanTitle(title, { brand, publisher });
+        set('name', name);
+        if (brand && !brandEl.value.trim()) { brandEl.value = brand; filled.push('brand'); brandEl.dispatchEvent(new Event('change')); }
+        set('details', variant);
+        if (img && !image) {
+          let src = img;
+          try { src = await compressImage(img); } catch {}
+          setImage(src);
+          filled.push('photo');
+        }
+        if (price != null) { sitePrice = price; filled.push(`price (${formatMoney(price)})`); }
+        // Guess the category from the brand and product name, unless you've picked one.
+        if (!categoryTouched) {
+          const cat = classifyWant(brandEl.value, $('[name=name]', d).value).category;
+          const r = $(`[name=category][value="${CSS.escape(cat)}"]`, d);
+          if (r && !r.checked) { r.checked = true; filled.push('category'); }
+        }
+        drawSizes();
+        status(filled.length ? `Filled ${filled.join(', ')} from ${esc(host)}. Check it over, then Save.` : `Nothing new to fill from ${esc(host)}.`);
+        if (filled.length) haptic();
       } catch (err) {
-        toast(err.message || 'Couldn’t fetch a preview');
+        status(esc(err.message || 'Couldn’t read that page.'));
       } finally {
-        btn.disabled = false;
-        btn.textContent = 'Get photo from link';
+        fetchBtn.disabled = false;
+        fetchBtn.textContent = 'Refresh from link';
       }
     };
+    fetchBtn.onclick = () => { lastLooked = ''; fillFromLink(); };
+    // Pasting or typing a full link starts the lookup on its own (new wishes, or when the form is empty).
+    const autoOK = () => isNew || !$('[name=name]', d).value.trim();
+    urlEl.addEventListener('paste', () => setTimeout(() => autoOK() && fillFromLink({ auto: true }), 0));
+    urlEl.addEventListener('change', () => autoOK() && fillFromLink({ auto: true }));
+    if (isNew) setTimeout(() => urlEl.focus(), 60);
     // Native paste (long-press -> Paste) anywhere in the sheet, including the paste box.
     const zone = $('[data-paste-zone]', d);
     const usePasted = async (r) => {
       if (r?.image) { setImage(r.image); zone.blur(); haptic(); toast('Photo added'); return true; }
       if (r?.link) {
-        const url = $('[name=url]', d);
-        if (!url.value) url.value = r.link;
-        toast('That’s a page link, not a photo. Tap “Get photo from link”.');
+        if (!urlEl.value) urlEl.value = r.link;
+        zone.blur();
+        fillFromLink();
         return true;
       }
       return false;
@@ -980,6 +1014,11 @@ function openWant(w) {
         if (ranks.length) x.rank = Math.max(...ranks) + 1024;
       }
       await write([{ store: 'wants', put: x }]);
+      const host = x.url && hostOf(x.url);
+      if (host && x.brand) {
+        const map = getSetting('domainBrands', {});
+        if (map[host] !== x.brand) await putSetting('domainBrands', { ...map, [host]: x.brand });
+      }
       d.close();
       await reload();
       // If the current filter or search hides it (e.g. saved into another category), show All.
