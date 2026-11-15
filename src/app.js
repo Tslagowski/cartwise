@@ -747,7 +747,7 @@ async function shopifyLookup(url) {
     const img = (variant?.image_id && p.images?.find((i) => i.id === variant.image_id)) || p.images?.[0] || p.image;
     let image = img?.src || '';
     if (image) { const iu = new URL(image); iu.searchParams.set('width', '1000'); image = iu.toString(); }
-    return { image, title: p.title || '', brand: p.vendor || '', price: variant?.price != null ? Number(variant.price) : null, variant: variant?.title && variant.title !== 'Default Title' ? variant.title : '' };
+    return { image, title: p.title || '', brand: p.vendor || '', price: variant?.price != null ? Number(variant.price) : null, variant: vid && variant?.title && variant.title !== 'Default Title' ? variant.title : '' };
   } catch {
     return null;
   } finally {

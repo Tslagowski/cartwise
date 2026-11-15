@@ -64,3 +64,16 @@ test('Shopify JSON with a variant in the URL', () => {
     variants: [{ id: 11, title: 'Brown / 10', price: '199.00', image_id: 1 }, { id: 22, title: 'Black / 10.5', price: '179.00', image_id: 2 }] } }, 'https://thursdayboots.com/products/x?variant=22');
   assert.deepEqual(p, { name: 'Premier High Top', brand: 'Thursday Boot Company', image: 'b.png', price: 179, currency: '', variant: 'Black / 10.5', site: '', source: 'shopify' });
 });
+
+test('Shopify link without a variant does not claim a size/color', () => {
+  const p = fromShopify({ product: { title: 'Tee', vendor: 'True Classic', images: [{ id: 1, src: 'a.png' }], variants: [{ id: 11, title: 'S', price: '29.99', image_id: 1 }] } }, 'https://x.com/products/tee');
+  assert.equal(p.variant, '');
+  assert.equal(p.price, 29.99);
+});
+
+test('generic share/placeholder images are ignored, real ones kept', () => {
+  const lg = extractProduct('<script type="application/ld+json">{"@type":"Product","name":"TV"}</script><meta property="og:image" content="https://www.lg.com/lg5-common/images/common/share/share-default.jpg">', 'https://lg.com');
+  assert.equal(lg.image, '');
+  const ss = extractProduct('<meta property="og:title" content="Pants"><meta property="og:image" content="https://cdn.suitsupply.com/products/trousers/default/b5788_28">', 'https://suitsupply.com');
+  assert.equal(ss.image, 'https://cdn.suitsupply.com/products/trousers/default/b5788_28');
+});

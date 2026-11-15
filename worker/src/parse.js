@@ -72,6 +72,10 @@ function offerPrice(p) {
   return { price: null, currency: '' };
 }
 
+// Generic share/placeholder images aren't product photos.
+const PLACEHOLDER = /(share[-_]?default|default[-_]?share|placeholder|no[-_]?image|\/logo[^/]*\.(png|svg|jpe?g|webp)(\?|$))/i;
+const realImage = (u) => (u && !PLACEHOLDER.test(u) ? u : '');
+
 const abs = (u, base) => {
   if (!u) return '';
   try {
@@ -91,7 +95,7 @@ export function extractProduct(html, pageUrl) {
   const out = {
     name: decode(product?.name || meta['og:title'] || meta['twitter:title'] || title),
     brand: decode(brandName(product?.brand) || meta['product:brand'] || meta['og:brand'] || ''),
-    image: abs(imageUrl(product?.image) || meta['og:image:secure_url'] || meta['og:image'] || meta['twitter:image'] || meta['twitter:image:src'], pageUrl),
+    image: realImage(abs(imageUrl(product?.image) || meta['og:image:secure_url'] || meta['og:image'] || meta['twitter:image'] || meta['twitter:image:src'], pageUrl)),
     price: fromLd.price ?? (Number.isFinite(metaPrice) && metaPrice > 0 ? metaPrice : null),
     currency: fromLd.currency || meta['product:price:currency'] || meta['og:price:currency'] || '',
     site: decode(meta['og:site_name'] || meta['application-name'] || ''),
@@ -110,7 +114,8 @@ export function fromShopify(json, pageUrl) {
   return {
     name: p.title || '', brand: p.vendor || '', image: img?.src || '',
     price: variant?.price != null ? Number(variant.price) : null, currency: '',
-    variant: variant?.title && variant.title !== 'Default Title' ? variant.title : '',
+    // Only name a size/color when the link points at one; otherwise it's just the store's first option.
+    variant: vid && variant?.title && variant.title !== 'Default Title' ? variant.title : '',
     site: '', source: 'shopify',
   };
 }
