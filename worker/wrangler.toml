@@ -2,3 +2,5 @@ name = "cartwise-lookup"
 main = "src/index.js"
 compatibility_date = "2026-11-01"
 workers_dev = true
+# Not a secret: identifies the Cloudflare account. The API token lives in the CLOUDFLARE_API_TOKEN repo secret.
+account_id = "da195e1d8899602db8727800d350ff25"

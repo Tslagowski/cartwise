@@ -757,7 +757,7 @@ async function shopifyLookup(url) {
 
 // Cartwise's own lookup service (a free Cloudflare Worker, see /worker). Reads a product page's
 // built-in details (name, brand, price, photo) for most stores, with no daily limit.
-const DEFAULT_LOOKUP = '';
+const DEFAULT_LOOKUP = 'https://cartwise-lookup.trevisslagowski.workers.dev';
 const lookupBase = () => (getSetting('lookupUrl', '') || DEFAULT_LOOKUP).replace(/\/+$/, '');
 async function workerLookup(url) {
   const base = lookupBase();

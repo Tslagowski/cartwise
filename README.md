@@ -16,9 +16,7 @@ Phone-first shopping + grocery app: a **wishlist** of things I want, a reusable 
 Everything lives on your phone in IndexedDB. There's no server or account. The only network call is the optional "From link" image lookup, which sends that one link to Microlink's free preview API. Export a backup now and then: Safari can clear storage for sites you haven't opened in weeks (installing to the Home Screen makes that much less likely).
 
 ## Product lookup service (optional)
-`worker/` is a tiny Cloudflare Worker that reads product pages for the app (name, brand, price, photo) so links fill in without the 5-a-day limit. It deploys automatically from GitHub Actions once these repository secrets exist:
-- `CLOUDFLARE_API_TOKEN` — Cloudflare → My Profile → API Tokens → Create Token → "Edit Cloudflare Workers"
-- `CLOUDFLARE_ACCOUNT_ID` — shown on the Cloudflare Workers & Pages overview
+`worker/` is a tiny Cloudflare Worker that reads product pages for the app (name, brand, price, photo) so links fill in without the 5-a-day limit. It deploys automatically from GitHub Actions to https://cartwise-lookup.trevisslagowski.workers.dev once the `CLOUDFLARE_API_TOKEN` repository secret exists (Cloudflare → My Profile → API Tokens → Create Token → "Edit Cloudflare Workers"). The account ID is in `worker/wrangler.toml`.
 
 ## Develop
 No build step, no dependencies.
