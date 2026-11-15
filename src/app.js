@@ -184,6 +184,23 @@ const ICON = {
   link: '<svg viewBox="0 0 24 24"><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></svg>',
 };
 
+// ---------- page scroll lock while a sheet/viewer is open ----------
+// iPhone Safari scrolls the page behind a <dialog> when a drag starts in a text field and the
+// sheet can't scroll further. Pin the page in place while any dialog is open.
+let lockedY = null;
+function lockScroll() {
+  if (lockedY != null) return;
+  lockedY = scrollY;
+  Object.assign(document.body.style, { position: 'fixed', top: `-${lockedY}px`, left: '0', right: '0' });
+}
+function unlockScroll() {
+  if (lockedY == null || $('dialog[open]')) return;
+  const y = lockedY;
+  lockedY = null;
+  Object.assign(document.body.style, { position: '', top: '', left: '', right: '' });
+  scrollTo(0, y);
+}
+
 // ---------- sheet (one reusable dialog) ----------
 const sheet = () => $('#sheet');
 function openSheet(title, body, wire, { full = false } = {}) {
@@ -197,9 +214,9 @@ function openSheet(title, body, wire, { full = false } = {}) {
     <header class="sheet-head"><h2>${esc(title)}</h2><button type="button" class="icon-btn" data-close aria-label="Close">✕</button></header>
     <div class="sheet-body">${body}</div></form>`;
   $('[data-close]', d).onclick = () => d.close();
-  d.onclose = () => { const t = $('#toast'); if (t && d.contains(t)) document.body.append(t); };
+  d.onclose = () => { const t = $('#toast'); if (t && d.contains(t)) document.body.append(t); unlockScroll(); };
   d.querySelector('form').onsubmit = (e) => e.preventDefault();
-  if (!d.open) d.showModal();
+  if (!d.open) { lockScroll(); d.showModal(); }
   wire?.(d);
 }
 function toast(msg, action) {
@@ -615,7 +632,7 @@ function renderWishlist() {
       w.status === 'bought' && w.boughtAt && `bought ${fmtShort(w.boughtAt.slice(0, 10))}`].filter(Boolean).join(' · ');
     return swipeRow(
       `<div class="cell tap" data-want="${w.id}">
-        ${w.image ? `<img class="thumb" src="${esc(w.image)}" alt="" loading="lazy">` : ''}
+        ${w.image ? `<img class="thumb tap" src="${esc(w.image)}" alt="Photo of ${esc(w.name)}" loading="lazy" data-view-img="${w.id}">` : ''}
         <div class="grow">
           <div class="title">${w.priority === 'High' ? `<span class="star" aria-label="Must-have">${ICON.star}</span>` : ''}${esc(w.name)}</div>
           ${sub ? `<div class="sub">${sub}</div>` : ''}
@@ -658,8 +675,39 @@ function renderWishlist() {
     ${listHtml}`;
 }
 
+// ---------- photo viewer ----------
+// Full-screen look at a wish's photo. actions: [{ label, cls, run }]
+function openViewer({ src, title = '', sub = '', link = '', actions = [] }) {
+  const v = $('#viewer');
+  v.innerHTML = `<div class="viewer-inner" data-viewer-bg>
+    <button type="button" class="icon-btn viewer-close" data-viewer-close aria-label="Close">✕</button>
+    <img class="viewer-img" src="${esc(src)}" alt="${esc(title)}">
+    ${title || sub ? `<div class="viewer-cap">${title ? `<div class="title">${esc(title)}</div>` : ''}${sub ? `<div class="sub">${sub}</div>` : ''}</div>` : ''}
+    <div class="viewer-actions">${link ? `<a class="btn" href="${esc(link)}" target="_blank" rel="noopener">Open ${esc(safeHost(link))}</a>` : ''}${actions.map((a, i) => `<button type="button" class="btn ${a.cls || ''}" data-viewer-act="${i}">${esc(a.label)}</button>`).join('')}</div>
+  </div>`;
+  const close = () => v.close();
+  v.onclick = (e) => {
+    const act = e.target.closest('[data-viewer-act]');
+    if (act) { close(); return actions[Number(act.dataset.viewerAct)].run(); }
+    if (e.target.closest('[data-viewer-close]') || e.target.matches('[data-viewer-bg], dialog') ) close();
+  };
+  // Swipe down to close.
+  let y0 = null;
+  v.ontouchstart = (e) => { y0 = e.touches.length === 1 ? e.touches[0].clientY : null; };
+  v.ontouchmove = (e) => { if (y0 == null) return; const dy = e.touches[0].clientY - y0; if (dy > 0) $('.viewer-img', v).style.transform = `translateY(${dy}px)`; };
+  v.ontouchend = (e) => {
+    if (y0 == null) return;
+    const dy = (e.changedTouches[0]?.clientY ?? y0) - y0;
+    y0 = null;
+    if (dy > 110) close(); else $('.viewer-img', v).style.transform = '';
+  };
+  v.onclose = () => unlockScroll();
+  lockScroll();
+  if (!v.open) v.showModal();
+}
+
 // ---------- images ----------
-function compressImage(src, max = 480) {
+function compressImage(src, max = 1000) {
   return new Promise((resolve, reject) => {
     const img = new Image();
     img.crossOrigin = 'anonymous';
@@ -697,7 +745,7 @@ async function shopifyLookup(url) {
     const variant = (vid && p.variants?.find((v) => String(v.id) === vid)) || p.variants?.[0];
     const img = (variant?.image_id && p.images?.find((i) => i.id === variant.image_id)) || p.images?.[0] || p.image;
     let image = img?.src || '';
-    if (image) { const iu = new URL(image); iu.searchParams.set('width', '600'); image = iu.toString(); }
+    if (image) { const iu = new URL(image); iu.searchParams.set('width', '1000'); image = iu.toString(); }
     return { image, title: p.title || '', brand: p.vendor || '', price: variant?.price != null ? Number(variant.price) : null, variant: variant?.title && variant.title !== 'Default Title' ? variant.title : '' };
   } catch {
     return null;
@@ -833,8 +881,15 @@ function openWant(w) {
       $('[data-img]', d).innerHTML = src ? `<img src="${esc(src)}" alt="">` : '<span>+ Photo</span>';
     };
     $('[data-img]', d).onclick = () => {
-      if (image) { if (confirm('Remove this photo?')) setImage(''); return; }
-      $('[data-file]', d).click();
+      if (!image) return $('[data-file]', d).click();
+      openViewer({
+        src: image,
+        title: $('[name=name]', d).value.trim(),
+        actions: [
+          { label: 'Replace photo', run: () => $('[data-file]', d).click() },
+          { label: 'Remove photo', cls: 'danger', run: () => setImage('') },
+        ],
+      });
     };
     $('[data-file]', d).onchange = async (e) => {
       const f = e.target.files[0];
@@ -1563,7 +1618,9 @@ function wireSheetGestures() {
   d.addEventListener('touchstart', (e) => {
     const body = e.target.closest('.sheet-body');
     const onHandle = e.target.closest('.grabber, .sheet-head') && !e.target.closest('button');
-    const atTop = body && body.scrollTop <= 0 && !e.target.closest('input, textarea, select, .chips.scroll');
+    const ta = e.target.closest('textarea');
+    const scrollableText = ta && ta.scrollHeight > ta.clientHeight && ta.scrollTop > 0;
+    const atTop = body && body.scrollTop <= 0 && !scrollableText && !e.target.closest('select, .chips.scroll, [data-drag]');
     if (!onHandle && !atTop) return (tracking = false);
     tracking = true;
     dragging = !!onHandle;
@@ -1719,6 +1776,15 @@ function wire() {
     if (t('[data-drag]')) return;
     if (t('[data-sort-menu]')) return openSortMenu();
     if (t('[data-want-filter]')) return (ui.wantFilter = t('[data-want-filter]').dataset.wantFilter), render();
+    if (t('[data-view-img]')) {
+      const w = S.wants.find((x) => x.id === t('[data-view-img]').dataset.viewImg);
+      return openViewer({
+        src: w.image, title: w.name,
+        sub: [w.brand && `<b>${esc(w.brand)}</b>`, w.details && esc(w.details), w.targetPrice != null && `target ${formatMoney(w.targetPrice)}`, w.sitePrice != null && `${formatMoney(w.sitePrice)} on site`].filter(Boolean).join(' · '),
+        link: w.url,
+        actions: [{ label: 'Edit', run: () => openWant(w) }],
+      });
+    }
     if (t('[data-want]')) return openWant(S.wants.find((w) => w.id === t('[data-want]').dataset.want));
     if (t('[data-prices-view]')) return (ui.pricesView = t('[data-prices-view]').dataset.pricesView), render();
     if (t('[data-trip]')) return openPurchase({ trip: S.trips.find((x) => x.id === t('[data-trip]').dataset.trip) });
