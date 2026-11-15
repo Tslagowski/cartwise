@@ -755,6 +755,34 @@ async function shopifyLookup(url) {
   }
 }
 
+// Cartwise's own lookup service (a free Cloudflare Worker, see /worker). Reads a product page's
+// built-in details (name, brand, price, photo) for most stores, with no daily limit.
+const DEFAULT_LOOKUP = '';
+const lookupBase = () => (getSetting('lookupUrl', '') || DEFAULT_LOOKUP).replace(/\/+$/, '');
+async function workerLookup(url) {
+  const base = lookupBase();
+  if (!base) return null;
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 12000);
+  try {
+    const res = await fetch(`${base}/lookup?url=${encodeURIComponent(url)}`, { signal: ctrl.signal });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || (!data.name && !data.image)) return { error: data.error === 'blocked' ? 'That store blocks lookups.' : 'Couldn’t read that page.' };
+    return data;
+  } catch {
+    return { error: 'Couldn’t reach the lookup service.' };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+// Save a local copy of a photo; if the image host blocks that, fetch it through the lookup service.
+async function savePhoto(src) {
+  try { return await compressImage(src); } catch {}
+  const base = lookupBase();
+  if (base) { try { return await compressImage(`${base}/img?url=${encodeURIComponent(src)}`); } catch {} }
+  return src; // keep the remote link so it still shows
+}
+
 // Free link preview (Microlink, no key). Their free plan allows only a few lookups a day,
 // so we read the rate-limit headers and say plainly when it's used up and when it resets.
 async function linkPreview(url) {
@@ -924,8 +952,11 @@ function openWant(w) {
       try {
         let title = '', brand = '', img = '', publisher = '', price = null, variant = '';
         const shop = await shopifyLookup(url);
+        const svc = shop ? null : await workerLookup(url);
         if (shop) {
           ({ title, brand, image: img, price, variant } = shop);
+        } else if (svc && !svc.error) {
+          ({ name: title, brand, image: img, price, variant = '', site: publisher } = svc);
         } else {
           const pv = await linkPreview(url);
           ({ title, image: img, publisher } = pv);
@@ -937,9 +968,7 @@ function openWant(w) {
         if (brand && !brandEl.value.trim()) { brandEl.value = brand; filled.push('brand'); brandEl.dispatchEvent(new Event('change')); }
         set('details', variant);
         if (img && !image) {
-          let src = img;
-          try { src = await compressImage(img); } catch {}
-          setImage(src);
+          setImage(await savePhoto(img));
           filled.push('photo');
         }
         if (price != null) { sitePrice = price; filled.push(`price (${formatMoney(price)})`); }
@@ -1552,6 +1581,11 @@ async function openSettings() {
     </div>
     <h3>Bring in a list</h3>
     <div class="group-box form"><button type="button" class="btn" data-notes>Paste from Notes</button></div>
+    <h3>Product lookup</h3>
+    <div class="group-box form">
+      <p class="sub">${lookupBase() ? `Connected to <b>${esc(lookupBase().replace(/^https?:\/\//, ''))}</b>: links fill in from most stores with no daily limit.` : 'Not connected yet: non-Shopify links use the free preview service (5 a day).'}</p>
+      <label>Lookup service address<input name="lookupUrl" type="url" value="${esc(getSetting('lookupUrl', ''))}" placeholder="${esc(DEFAULT_LOOKUP || 'https://cartwise-lookup.<you>.workers.dev')}" autocomplete="off"></label>
+    </div>
     <h3>My sizes</h3>
     <div class="group-box form" data-sizes-box>${sizesListHtml()}
       <div class="grid2"><input name="sizeBrand" list="dl-brands" placeholder="Brand" autocomplete="off"><input name="sizeValue" placeholder="Size, e.g. L or 33x34"></div>
@@ -1572,6 +1606,12 @@ async function openSettings() {
     <p class="sub version">Cartwise v${window.CARTWISE_VERSION || ''} · ${S.trips.length} trips · ${S.products.length} items priced</p>`;
   openSheet('Settings', body, (d) => {
     $('[data-export]', d).onclick = exportData;
+    $('[name=lookupUrl]', d).addEventListener('change', async (e) => {
+      const v = e.target.value.trim();
+      if (v && !/^https:\/\//.test(v)) return toast('Use the full https:// address');
+      await putSetting('lookupUrl', v);
+      toast(v ? 'Lookup service saved' : 'Using the default lookup service');
+    });
     const box = $('[data-sizes-box]', d);
     box.addEventListener('click', async (e) => {
       const rm = e.target.closest('[data-rm-size]');

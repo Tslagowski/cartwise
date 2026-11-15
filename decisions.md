@@ -27,6 +27,7 @@ Running log from grill sessions. One row per question answered. Big or hard-to-r
 | 18 | 2026-11-14 | Receipt scanning? | Later, maybe | Most grocery trips are pickup; only Walmart/Costco in person, and Costco prices are steady | |
 | 19 | 2026-11-14 | How should the wishlist be ordered? | Default to My order (drag to arrange) with standard sorts and a group-by choice | User wants to rank wishes in the order they want them, plus price/date/brand sorts | |
 | 20 | 2026-11-15 | How should adding a wish get easier? | Paste a product link and the form fills itself (no setup); a free Cloudflare Worker for any store is a possible next step | Shopify gives everything for free; other stores need a server to read product data, so start without one | |
+| 21 | 2026-11-15 | Remove the 5/day lookup limit? | Run our own lookup on a free Cloudflare Worker, deployed from the repo via GitHub Actions with repo secrets | Free, no daily cap in practice, reads structured product data most stores publish; secrets stay in GitHub, not in chat | |
 
 ## Superseded
 Decisions that were later changed. Keep them, so agents don't re-propose them.
