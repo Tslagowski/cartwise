@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#f7f5ef">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Wardrobe">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="apple-touch-icon" href="../../icons/apple-touch-icon.png">
+  <link rel="stylesheet" href="style.css">
+  <title>Wardrobe preview</title>
+</head>
+<body>
+  <header class="masthead">
+    <div>
+      <h1>Wardrobe</h1>
+      <p id="offline-status" role="status">Preparing offline access…</p>
+    </div>
+    <p class="notice">Experimental<br>Local · not backed up</p>
+  </header>
+  <nav aria-label="Wardrobe">
+    <button type="button" id="closet-tab" aria-current="page">Closet</button>
+    <button type="button" id="outfits-tab">Outfits</button>
+  </nav>
+  <main>
+    <p id="message" class="message" role="status" hidden></p>
+    <section id="closet" aria-labelledby="closet-title">
+      <div class="section-head">
+        <div><h2 id="closet-title" tabindex="-1">Closet</h2><p id="piece-count">Loading pieces…</p></div>
+        <button id="add-piece" class="primary" type="button" disabled>Add piece</button>
+      </div>
+      <div id="closet-grid" class="grid"></div>
+    </section>
+    <section id="outfits" aria-labelledby="outfits-title" hidden>
+      <div class="section-head">
+        <div><h2 id="outfits-title" tabindex="-1">Outfits</h2><p id="outfit-count">Loading outfits…</p></div>
+        <button id="new-outfit" class="primary" type="button" disabled>Create outfit</button>
+      </div>
+      <div id="outfit-list" class="outfit-list"></div>
+    </section>
+    <section id="piece-detail" aria-labelledby="piece-title" hidden>
+      <div class="section-head">
+        <h2 id="piece-title" tabindex="-1"></h2>
+        <button id="close-detail" type="button">Back</button>
+      </div>
+      <div id="piece-content"></div>
+    </section>
+    <section id="piece-editor" aria-labelledby="piece-editor-title" hidden>
+      <div class="section-head">
+        <h2 id="piece-editor-title" tabindex="-1">Add piece</h2>
+        <button id="cancel-piece" type="button">Cancel</button>
+      </div>
+      <form id="piece-form" novalidate>
+        <div class="field">
+          <label for="photo">Photo</label>
+          <input id="photo" name="photo" type="file" accept="image/*,.heic,.heif" aria-describedby="photo-error" required>
+          <img id="photo-preview" class="photo-preview" alt="Selected photo" hidden>
+          <p id="photo-error" class="error" aria-live="polite"></p>
+        </div>
+        <div class="field">
+          <label for="piece-name">Name</label>
+          <input id="piece-name" name="name" maxlength="120" aria-describedby="piece-name-error" required>
+          <p id="piece-name-error" class="error"></p>
+        </div>
+        <div class="field">
+          <label for="ownership">Ownership</label>
+          <select id="ownership" name="ownership" aria-describedby="ownership-error" required></select>
+          <p id="ownership-error" class="error"></p>
+        </div>
+        <div class="field-pair">
+          <div class="field">
+            <label for="category">Category</label>
+            <select id="category" name="category" aria-describedby="category-error" required></select>
+            <p id="category-error" class="error"></p>
+          </div>
+          <div class="field">
+            <label for="fit-state">Fit state</label>
+            <select id="fit-state" name="fitState" aria-describedby="fit-state-error" required></select>
+            <p id="fit-state-error" class="error"></p>
+          </div>
+        </div>
+        <details id="optional-fields">
+          <summary>Brand, size, color, and notes</summary>
+          <div class="field"><label for="brand">Brand</label><input id="brand" name="brand" maxlength="120"></div>
+          <div class="field-pair">
+            <div class="field"><label for="size">Size</label><input id="size" name="size" maxlength="120"></div>
+            <div class="field"><label for="color">Color</label><input id="color" name="color" maxlength="120"></div>
+          </div>
+          <div class="field"><label for="notes">Notes</label><textarea id="notes" name="notes" rows="3" maxlength="1000"></textarea></div>
+        </details>
+        <p id="piece-save-error" class="error" role="alert"></p>
+        <button class="primary save" type="submit">Save piece</button>
+      </form>
+    </section>
+    <section id="outfit-editor" aria-labelledby="outfit-editor-title" hidden>
+      <div class="section-head">
+        <h2 id="outfit-editor-title" tabindex="-1">Create outfit</h2>
+        <button id="cancel-outfit" type="button">Cancel</button>
+      </div>
+      <form id="outfit-form" novalidate>
+        <div class="field">
+          <label for="outfit-name">Outfit name</label>
+          <input id="outfit-name" name="name" maxlength="120" aria-describedby="outfit-name-error" required>
+          <p id="outfit-name-error" class="error"></p>
+        </div>
+        <div class="board">
+          <h3 id="board-title">On the board</h3>
+          <p id="board-empty">Tap pieces below to add them.</p>
+          <div id="board-grid" class="grid"></div>
+          <p id="board-error" class="error" role="alert"></p>
+        </div>
+        <div>
+          <h3>Choose pieces</h3>
+          <div id="picker-grid" class="grid"></div>
+        </div>
+        <div class="board-actions">
+          <p id="outfit-save-error" class="error" role="alert"></p>
+          <button class="primary save" type="submit">Save outfit</button>
+        </div>
+      </form>
+    </section>
+  </main>
+  <script type="module" src="app.js"></script>
+</body>
+</html>

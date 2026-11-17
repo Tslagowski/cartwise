@@ -1,5 +1,6 @@
 // Bump VERSION on every deploy so phones pick up the new files.
-const VERSION = 'cartwise-v0.9.2';
+const VERSION = 'cartwise-v0.9.3';
+const EXPERIMENTAL_PATH = new URL('./experimental/', self.registration.scope).pathname;
 const SHELL = [
   './',
   './index.html',
@@ -32,7 +33,9 @@ self.addEventListener('install', (e) => {
 self.addEventListener('activate', (e) => {
   e.waitUntil(
     caches.keys()
-      .then((keys) => Promise.all(keys.filter((k) => k !== VERSION).map((k) => caches.delete(k))))
+      .then((keys) => Promise.all(keys
+        .filter((k) => k.startsWith('cartwise-v') && k !== VERSION)
+        .map((k) => caches.delete(k))))
       .then(() => self.clients.claim())
   );
 });
@@ -41,7 +44,8 @@ self.addEventListener('activate', (e) => {
 // which would otherwise let a stale copy mix with new files). Falls back to cache offline.
 self.addEventListener('fetch', (e) => {
   const req = e.request;
-  if (req.method !== 'GET' || new URL(req.url).origin !== location.origin) return;
+  const url = new URL(req.url);
+  if (req.method !== 'GET' || url.origin !== location.origin || url.pathname.startsWith(EXPERIMENTAL_PATH)) return;
   e.respondWith(
     fetch(req.url, { cache: 'no-cache', credentials: 'same-origin' })
       .then((res) => {
@@ -51,6 +55,7 @@ self.addEventListener('fetch', (e) => {
         }
         return res;
       })
-      .catch(() => caches.match(req, { ignoreSearch: true }).then((r) => r || caches.match('./index.html')))
+      .catch(() => caches.open(VERSION).then(async (cache) =>
+        (await cache.match(req, { ignoreSearch: true })) || cache.match('./index.html')))
   );
 });

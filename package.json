@@ -1,6 +1,6 @@
 {
   "name": "cartwise",
-  "version": "0.9.2",
+  "version": "0.9.3",
   "private": true,
   "type": "module",
   "description": "Wishlist, groceries and price history PWA",
